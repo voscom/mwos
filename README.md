@@ -1,0 +1,1531 @@
+# MWOS3 - модульная OS v.3
+
+MWOS - это модульная операционная система управления микроконтроллерами, ориентированная на любые микроконтроллеры на платформе Arduino.
+
+Идея этой OS - в том, чтобы максимально упростить удаленное управление устройствами, посредством микроконтроллера.
+За каждое устройство (или группу однотипных устройств), подключенное к микроконтроллеру отвечает отдельный программный модуль.
+Каждый модуль имеет ряд параметров - для настройки устройства, управления им, и получения показаний от устройства (параметры модуля).
+Каждый параметр модуля, может иметь виджет (с настраиваемым внешним видом) на странице пользователя, для взаимодействия
+пользователя с устройством и для мониторинга показаний устройства.
+Список готовых модулей (поддерживаемых устройств) довольно большой. 
+При необходимости, вы легко можете добавить свой программный модуль для управления своим устройством. 
+
+В версии 3 отказались от блока настроек модулей. Теперь, настройки модулей можно делать через параметры.
+
+## Начало использования
+
+Зайдите на [сайт удаленного управления MWOS](https://iot.voscom.online/)
+
+- Включите свой контроллер на базе MWOS. Если контроллер зарегистрирован на вас - вы должны сразу увидеть его в своем личном кабинете.
+
+- Если контроллер не появился - выберите "Добавить контроллер по QR-коду" и покажите на камеру QR-код с экрана контроллера. Или введите код контроллера вручную.
+
+- Если контроллер находится не у вас - свяжитесь с администратором контроллера: Если вы знаете код или E-Mail своего администратора - укажите
+его в своем личном кабинете. Администратору будет автоматически отправлена заявка для добавление вам прав на управление контроллером.
+После появления контроллера в Вашем личном кабинете - вы сразу можете управлять им и подключенным к нему устройствами.
+
+## Создание своего контроллера
+
+- Выберите наиболее удобный вам микроконтроллер из списка поддерживаемых.
+- Убедитесь, что у микроконтроллера есть аппаратная возможность подключения к сети (WiFi,LAN,USB,RS232,RS485,CAN,...).
+
+В личном кабинете выберите "Создать прошивку контроллера"
+Заполните форму:
+- [ ] Выберите микроконтроллер из списка
+- [ ] Выберите тип соединения своего контроллера с сетью (WiFi,LAN,USB,RS232,RS485,CAN,...) 
+- [ ] Укажите программные модули поддержки устройств, которые включить в прошивку
+- [ ] Нажмите "Скачать прошивку BIN"
+
+Вам будет загружена прошивка с MWOS для выбранного вами микроконтроллера. Вы можете загрузить ее в микроконтроллер через сервисные программы.
+После включения контроллер сразу же станет доступен в вашем личном кабинете и вы станете его администратором. 
+Администратор контроллера может делегировать любую часть своих прав управления контроллером, другим пользователям сайта.
+
+## Создание своих модулей
+
+Создать программный модуль управления устройством не сложнее, чем сделать простейший скетч для Ардуино.
+На сайте есть примеры и шаблоны создания собственных модулей на языке c++.
+Операционная система сама позаботится о связи контроллера и об удаленном управления параметрами Вашего модуля.
+Загрузите и зарегистрируйте свой модуль в личном кабинете, выбрав "Регистрация нового модуля".
+После этого следуйте инструкциям создания своего контроллера.
+
+## Добавление типа микроконтроллера в поддерживаемые
+
+В большинстве случаев, прошивка может быть скомпилирована на любой микроконтроллер с поддержкой программной платформы Arduino.
+Не путайте платформу Arduino и микроконтроллеры Arduino. Платформа - это скорее некий набор типовых библиотек и правил конфигурации микроконтроллера.
+Впервые такая платформа была использована на микроконтроллеры Arduino, но позже распостранилась на очень большой спектр самых разных микроконтроллеров
+от простейших Atmel серии ATtiny до многоядерных Rasberry. Есть даже варианты платформы Arduino для компиляции под Linux. В этом случае, прошивка с MWOS 
+может запускаться на поддерживаемых ПК, как приложение.
+Если для необходимого вам микроконтроллера нет платформы Arduino, то ее можно добавить на него - все исходники легко найти на публичных Git-серверах. 
+Конечно, добавление платформы Arduino на новый микроконтроллер - задача не простая. Но как результат (помимо MWOS) вы получите возможность компиляции под 
+Ваш микроконтроллер огромного количества скетчей и программ для платформы Arduino. А так же поддержку большого и активного сообщества.
+Сейчас, большинство разработчиков новых микроконтроллеров, сразу добавляют своему продукту поддержку платформы Arduino. 
+
+В личном кабинете выберите "Создать прошивку контроллера"
+Заполните форму:
+- [ ] Выберите микроконтроллер из списка
+- [ ] Выберите тип соединения своего контроллера с сетью (WiFi,LAN,USB,RS232,RS485,CAN,...)
+- [ ] Укажите программные модули поддержки устройств, которые включить в прошивку
+- [ ] Нажмите "Скачать исходники прошивки"
+
+Вам будут загружены исходники прошивки с MWOS на языке c++, которые вы можете скомпилировать сами. 
+
+## Список рекомендуемых микроконтроллеров
+
+### ESP32
+Микроконтроллеры этой серии содержат встроенный модуль связи по WiFi, bluetooth, USB.
+А так же FLASH-память пригодную для использования под файловую систему (до 15Mb).
+Огромное количество встроенных аппаратных решений, практически на все случаи.
+Из недостатков можно только отметить отсутствие толерантности к 5V (все периферийные устройтва должны быть 3.3V или 
+подключаться через согласование уровней), но как правило - встроенных в микроконтроллер аппаратных решений хватает 
+для замены любой периферии.
+
+ - [ESP32-S3-WROOM-1-N16R8](https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf) (Рекомендуем для новых разработок!)
+ - [ESP32](https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf) (На 2022г микроконтроллер устарел, но на нем можно встретить много готовых решений) 
+
+### STM32
+Большое количество портов ввода-вывода (в том числе толерантных к 5V). Довольно много встроенных аппаратных решений. Большое и устоявшееся сообщество.
+Из минусов - кроме USB нет способов прямого подключения к сети, нет встроенной файловой системы (но можно использовать SD-карты или внешние микросхеммы FLASH).
+Рекомендуем использовать в подчиненных сетях.
+
+ - [STM32F411CEU](https://www.st.com/resource/en/datasheet/stm32f411re.pdf) (похож на значительно улучшенный вариант STM32F103CB, и не сильно дороже) 
+ - [STM32F103CB](https://www.st.com/resource/en/datasheet/cd00161566.pdf) (недорогой и самый распостраненный контроллер STM32 начального уровня)
+
+### ESP8266
+Микроконтроллеры этой серии содержат встроенный модуль связи по WiFi и USB.
+А в некоторых вариантах и FLASH-память пригодную для использования под файловую систему (до 3Mb).
+Очень привлекательная цена. Но мало портов ввода-вывода.
+
+- [ESP8266](https://www.espressif.com/sites/default/files/documentation/0a-esp8266ex_datasheet_en.pdf) (Удобно для управления небольшим количеством устройств)
+
+
+## Не полный список поддерживаемых микроконтроллеров
+
+### Aceinna IMU
+- Aceinna Low Cost RTK
+- Aceinna MTLT335
+- Aceinna OpenIMU 300
+- Aceinna OpenIMU 300ZA
+- Aceinna OpenIMU 330
+- Aceinna OpenIMU 330ZA
+- Aceinna OpenRTK330L
+### Atmel AVR
+- AT90CAN128
+- AT90CAN32
+- AT90CAN64
+- ATmega128/A
+- ATmega1280
+- ATmega1281
+- ATmega1284
+- ATmega1284P
+- ATmega16
+- ATmega162
+- ATmega164A
+- ATmega164P/PA
+- ATmega165/A
+- ATmega165P/PA
+- ATmega168/A
+- ATmega168P/PA
+- ATmega168PB
+- ATmega169/P/PA
+- ATmega169A
+- ATmega2560
+- ATmega2561
+- ATmega32
+- ATmega324A
+- ATmega324P
+- ATmega324PA
+- ATmega324PB
+- ATmega325/A
+- ATmega3250/A
+- ATmega3250P/PA
+- ATmega325P/PA
+- ATmega328
+- ATmega328P/PA
+- ATmega328PB
+- ATmega329/A
+- ATmega3290/A
+- ATmega3290P/PA
+- ATmega329P/PA
+- ATmega48/A
+- ATmega48P/PA
+- ATmega48PB
+- ATmega64/A
+- ATmega640
+- ATmega644/A
+- ATmega644P/PA
+- ATmega645/A
+- ATmega6450/A
+- ATmega6450P
+- ATmega645P
+- ATmega649/A
+- ATmega6490/A
+- ATmega6490P
+- ATmega649P
+- ATmega8/A
+- ATmega8515
+- ATmega8535
+- ATmega88/A
+- ATmega88P/PA
+- ATmega88PB
+- ATtiny13
+- ATtiny13A
+- Adafruit Bluefruit Micro
+- Adafruit Circuit Playground Classic
+- Adafruit Feather 328P
+- Adafruit Feather 32u4
+- Adafruit Flora
+- Adafruit Gemma
+- Adafruit ItsyBitsy 3V/8MHz
+- Adafruit ItsyBitsy 5V/16MHz
+- Adafruit Metro
+- Adafruit Pro Trinket 3V/12MHz (FTDI)
+- Adafruit Pro Trinket 3V/12MHz (USB)
+- Adafruit Pro Trinket 5V/16MHz (FTDI)
+- Adafruit Pro Trinket 5V/16MHz (USB)
+- Adafruit Trinket 3V/8MHz
+- Adafruit Trinket 5V/16MHz
+- Alorium Hinj
+- Alorium Sno
+- Alorium XLR8
+- Altair
+- Anarduino MiniWireless
+- Arduboy
+- Arduboy DevKit
+- Arduino BT ATmega168
+- Arduino BT ATmega328
+- Arduino Duemilanove or Diecimila ATmega168
+- Arduino Duemilanove or Diecimila ATmega328
+- Arduino Esplora
+- Arduino Ethernet
+- Arduino Fio
+- Arduino Industrial 101
+- Arduino Leonardo
+- Arduino Leonardo ETH
+- Arduino LilyPad ATmega168
+- Arduino LilyPad ATmega328
+- Arduino LilyPad USB
+- Arduino Mega ADK
+- Arduino Mega or Mega 2560 ATmega1280
+- Arduino Mega or Mega 2560 ATmega2560 (Mega 2560)
+- Arduino Micro
+- Arduino Mini ATmega168
+- Arduino Mini ATmega328
+- Arduino NG or older ATmega168
+- Arduino NG or older ATmega8
+- Arduino Nano ATmega168
+- Arduino Nano ATmega328
+- Arduino Nano ATmega328 (New Bootloader)
+- Arduino Pro or Pro Mini ATmega168 (3.3V, 8 MHz)
+- Arduino Pro or Pro Mini ATmega168 (5V, 16 MHz)
+- Arduino Pro or Pro Mini ATmega328 (3.3V, 8 MHz)
+- Arduino Pro or Pro Mini ATmega328 (5V, 16 MHz)
+- Arduino Robot Control
+- Arduino Robot Motor
+- Arduino Uno
+- Arduino Yun
+- Arduino Yun Mini
+- Atmel AT90PWM216
+- Atmel AT90PWM316
+- BQ ZUM BT-328
+- BitWizard Raspduino
+- Controllino Maxi
+- Controllino Maxi Automation
+- Controllino Mega
+- Controllino Mini
+- Digispark Pro
+- Digispark Pro (16 MHz) (64 byte buffer)
+- Digispark Pro (32 byte buffer)
+- Digispark USB
+- Dwenguino
+- Elektor Uno R4
+- Engduino 3
+- EnviroDIY Mayfly
+- FYSETC F6 V1.3
+- Generic ATtiny1634
+- Generic ATtiny167
+- Generic ATtiny2313
+- Generic ATtiny24
+- Generic ATtiny25
+- Generic ATtiny261
+- Generic ATtiny4313
+- Generic ATtiny43U
+- Generic ATtiny44
+- Generic ATtiny441
+- Generic ATtiny45
+- Generic ATtiny461
+- Generic ATtiny48
+- Generic ATtiny828
+- Generic ATtiny84
+- Generic ATtiny841
+- Generic ATtiny85
+- Generic ATtiny861
+- Generic ATtiny87
+- Generic ATtiny88
+- LightBlue Bean
+- LightBlue Bean+
+- LightUp
+- Linino One
+- LinkIt Smart 7688 Duo
+- LoRa32u4II (868-915MHz)
+- LowPowerLab MightyHat
+- LowPowerLab Moteino
+- LowPowerLab Moteino (8Mhz)
+- LowPowerLab MoteinoMEGA
+- Microduino Core (Atmega168PA@16M,5V)
+- Microduino Core (Atmega168PA@8M,3.3V)
+- Microduino Core (Atmega328P@16M,5V)
+- Microduino Core (Atmega328P@8M,3.3V)
+- Microduino Core USB (ATmega32U4@16M,5V)
+- Microduino Core+ (ATmega1284P@16M,5V)
+- Microduino Core+ (ATmega1284P@8M,3.3V)
+- Microduino Core+ (Atmega644PA@16M,5V)
+- Microduino Core+ (Atmega644PA@8M,3.3V)
+- OpenEnergyMonitor emonPi
+- Original Prusa i3 MK3 Multi Material 2.0 Upgrade
+- PanStamp AVR
+- Pinoccio Scout
+- Pololu A-Star 32U4
+- Prusa RAMBo
+- Quirkbot
+- RedBearLab Blend
+- RedBearLab Blend Micro 3.3V/16MHz (overclock)
+- RedBearLab Blend Micro 3.3V/8MHz
+- RepRap RAMBo
+- SODAQ GaLoRa
+- SODAQ Mbili
+- SODAQ Moja
+- SODAQ Ndogo
+- SODAQ Tatu
+- Sanguino ATmega1284p (16MHz)
+- Sanguino ATmega1284p (8MHz)
+- Sanguino ATmega644 or ATmega644A (16 MHz)
+- Sanguino ATmega644 or ATmega644A (8 MHz)
+- Sanguino ATmega644P or ATmega644PA (16 MHz)
+- Sanguino ATmega644P or ATmega644PA (8 MHz)
+- Seeeduino
+- SparkFun ATmega128RFA1 Dev Board
+- SparkFun Digital Sandbox
+- SparkFun Fio V3 3.3V/8MHz
+- SparkFun Makey Makey
+- SparkFun Mega Pro 3.3V/8MHz
+- SparkFun Mega Pro 5V/16MHz
+- SparkFun Mega Pro Mini 3.3V
+- SparkFun MicroView
+- SparkFun Pro Micro 3.3V/8MHz
+- SparkFun Pro Micro 5V/16MHz
+- SparkFun Qduino Mini
+- SparkFun RedBoard
+- SparkFun Serial 7-Segment Display
+- SpellFoundry Sleepy Pi 2
+- Talk2 Whisper Node
+- The Things Uno
+- TinyCircuits TinyDuino Processor Board
+- TinyCircuits TinyLily Mini Processor
+- USBasp stick
+- Wicked Device WildFire V2
+- Wicked Device WildFire V3
+- ftDuino
+- nicai-systems BOB3 coding bot
+- nicai-systems NIBO 2 robot
+- nicai-systems NIBO burger robot
+- nicai-systems NIBO burger robot with Tuning Kit
+- nicai-systems NIBObee robot
+- nicai-systems NIBObee robot with Tuning Kit
+- ubIQio Ardhat
+### Atmel megaAVR
+- ATmega1608
+- ATmega1609
+- ATmega3208
+- ATmega3209
+- ATmega4808
+- ATmega4809
+- ATmega808
+- ATmega809
+- ATtiny1604
+- ATtiny1606
+- ATtiny1607
+- ATtiny1614
+- ATtiny1616
+- ATtiny1617
+- ATtiny1624
+- ATtiny1626
+- ATtiny1627
+- ATtiny202
+- ATtiny204
+- ATtiny212
+- ATtiny214
+- ATtiny3216
+- ATtiny3217
+- ATtiny3224
+- ATtiny3226
+- ATtiny3227
+- ATtiny402
+- ATtiny404
+- ATtiny406
+- ATtiny412
+- ATtiny414
+- ATtiny416
+- ATtiny417
+- ATtiny424
+- ATtiny426
+- ATtiny427
+- ATtiny804
+- ATtiny806
+- ATtiny807
+- ATtiny814
+- ATtiny816
+- ATtiny817
+- ATtiny824
+- ATtiny826
+- ATtiny827
+- AVR-IoT WG Development Board
+- AVR128DA28
+- AVR128DA32
+- AVR128DA48
+- AVR128DA64
+- AVR128DB28
+- AVR128DB32
+- AVR128DB48
+- AVR128DB64
+- AVR32DA28
+- AVR32DA32
+- AVR32DA48
+- AVR32DB28
+- AVR32DB32
+- AVR32DB48
+- AVR64DA28
+- AVR64DA32
+- AVR64DA48
+- AVR64DA64
+- AVR64DB28
+- AVR64DB32
+- AVR64DB48
+- AVR64DB64
+- AVR64DD14
+- AVR64DD20
+- AVR64DD28
+- AVR64DD32
+- Arduino Nano Every
+- Arduino Uno WiFi Rev2
+- Curiosity Nano ATmega4809
+- Curiosity Nano AVR128DA48
+- Curiosity Nano AVR128DB48
+- Xplained Pro ATmega4809
+### Atmel SAM
+- Adafruit BLM Badge
+- Adafruit Circuit Playground Express
+- Adafruit Crickit M0
+- Adafruit Feather M0
+- Adafruit Feather M0 Express
+- Adafruit Feather M4 CAN
+- Adafruit Feather M4 Express
+- Adafruit Gemma M0
+- Adafruit Grand Central M4
+- Adafruit Hallowing M0
+- Adafruit Hallowing M4
+- Adafruit ItsyBitsy M0
+- Adafruit ItsyBitsy M4
+- Adafruit MONSTER M4SK
+- Adafruit Matrix Portal M4
+- Adafruit Metro M0 Expresss
+- Adafruit Metro M4
+- Adafruit Metro M4 AirLift Lite
+- Adafruit NeoKey Trinkey
+- Adafruit NeoPixel Trinkey
+- Adafruit ProxLight Trinkey
+- Adafruit PyGamer Advance M4
+- Adafruit PyGamer M4 Express
+- Adafruit PyPortal M4
+- Adafruit PyPortal M4 Titano
+- Adafruit QT Py M0
+- Adafruit Rotary Trinkey
+- Adafruit Slide Trinkey
+- Adafruit Trellis M4
+- Adafruit Trinket M0
+- Adafruit pIRkey
+- Adafruit pyBadge AirLift M4
+- Adafruit pyBadge M4 Express
+- Arduino Due (Programming Port)
+- Arduino Due (USB Native Port)
+- Arduino M0
+- Arduino M0 Pro (Native USB Port)
+- Arduino M0 Pro (Programming/Debug Port)
+- Arduino MKR FOX 1200
+- Arduino MKR GSM 1400
+- Arduino MKR NB 1500
+- Arduino MKR WAN 1300
+- Arduino MKR WAN 1310
+- Arduino MKR WiFi 1010
+- Arduino MKR1000
+- Arduino MKRZERO
+- Arduino Tian
+- Arduino Zero (Programming/Debug Port)
+- Arduino Zero (USB Native Port)
+- Atmel ATSAMR21-XPRO
+- Atmel ATSAMW25-XPRO
+- Atmel SAMC21-XPRO
+- Atmel SAMD21-XPRO
+- Briki ABC (MBC-WB) - Samd21
+- Briki MBC-WB - Samd21
+- Digistump DigiX
+- LowPowerLab CurrentRanger
+- MKR Vidor 4000
+- Minitronics v2.0
+- Moteino M0
+- NANO 33 IoT
+- SODAQ Autonomo
+- SODAQ ExpLoRer
+- SODAQ ONE
+- SODAQ SARA
+- SODAQ SFF
+- SainSmart Due (Programming Port)
+- SainSmart Due (USB Native Port)
+- Seeeduino Femto M0
+- Seeeduino LoRaWAN
+- Seeeduino Wio Lite MG126
+- Seeeduino Wio Terminal
+- Seeeduino XIAO
+- Seeeduino Zero
+- SparkFun 9DoF Razor IMU M0
+- SparkFun Qwiic Micro
+- SparkFun RedBoard Turbo
+- SparkFun SAMD21 Dev Breakout
+- SparkFun SAMD21 Mini Breakout
+- SparkFun SAMD21 Pro RF
+- SparkFun SAMD51 MicroMod
+- SparkFun SAMD51 Thing Plus
+- Tuino 096
+### CHIPS Alliance
+- RVfpga: Digilent Nexys A7
+### Espressif 32
+- AI Thinker ESP32-CAM
+- ALKS ESP32
+- AZ-Delivery ESP-32 Dev Kit C V4
+- Adafruit ESP32 Feather
+- Adafruit ESP32-S2 Feather Development Board
+- Adafruit Feather ESP32 V2
+- Adafruit Feather ESP32-S2 TFT
+- Adafruit Feather ESP32-S3 2MB PSRAM
+- Adafruit Feather ESP32-S3 No PSRAM
+- Adafruit Feather ESP32-S3 TFT
+- Adafruit FunHouse
+- Adafruit ItsyBitsy ESP32
+- Adafruit MagTag 2.9
+- Adafruit Metro ESP32-S2
+- Adafruit QT Py ESP32
+- Adafruit QT Py ESP32-C3
+- Adafruit QT Py ESP32-S2
+- Adafruit QT Py ESP32-S3 No PSRAM
+- Ai-Thinker ESP-C3-M1-I-Kit
+- Ai-Thinker NodeMCU-32S2 (ESP-12K)
+- AirM2M CORE ESP32C3
+- April Brother ESPea32
+- BPI-Bit
+- BPI-Leaf-S3
+- Blinker WiFiduino32
+- Blinker WiFiduino32S3
+- Blinker WiFiduinoV2 (ESP32-C3)
+- Briki ABC (MBC-WB) - ESP32
+- Briki MBC-WB - ESP32
+- CNRS AW2ETH
+- Connaxio’s Espoir
+- Cytron Maker Feather AIoT S3
+- D-duino-32
+- DFRobot Beetle ESP32-C3
+- DFRobot Firebeetle 2 ESP32-S3
+- DOIT ESP32 DEVKIT V1
+- DOIT ESPduino32
+- Deneyap Kart
+- Deneyap Kart 1A
+- Deneyap Kart 1A v2
+- Deneyap Kart G
+- Deneyap Mini
+- Deneyap Mini v2
+- Denky D4 (PICO-V3-02)
+- Denky32 (WROOM32)
+- Deparment of Alchemy MiniMain ESP32-S2
+- Dongsen Tech Pocket 32
+- ESP32 FM DevKit
+- ESP32 Pico Kit
+- ESP32S3 CAM LCD
+- ESP32vn IoT Uno
+- ESPectro32
+- ESPino32
+- ETBoard
+- Electronic SweetPeas ESP320
+- EspinalLab ATMegaZero ESP32-S2
+- Espressif ESP-WROVER-KIT
+- Espressif ESP32 Dev Module
+- Espressif ESP32-C3-DevKitM-1
+- Espressif ESP32-S2-Kaluga-1 Kit
+- Espressif ESP32-S2-Saola-1
+- Espressif ESP32-S3-Box
+- Espressif ESP32-S3-DevKitC-1-N8 (8 MB QD, No PSRAM)
+- FireBeetle-ESP32
+- Fishino Piranha ESP-32
+- Franzininho WiFi
+- Franzininho WiFi Board
+- Franzininho WiFi MSC
+- Frog Board ESP32
+- HONEYLemon
+- Heltec WiFi Kit 32
+- Heltec WiFi Kit 32 (V2)
+- Heltec WiFi LoRa 32
+- Heltec WiFi LoRa 32 (V2)
+- Heltec Wireless Stick
+- Heltec Wireless Stick Lite
+- Hornbill ESP32 Dev
+- Hornbill ESP32 Minima
+- INEX OpenKB
+- Imbrios LogSens V1P1
+- IntoRobot Fig
+- IoTaaP Magnolia
+- KITS ESP32 EDU
+- LOGISENSES Senses Weizen
+- Labplus mPython
+- Lion:Bit Dev Board
+- M5Stack Core ESP32
+- M5Stack Core2
+- M5Stack FIRE
+- M5Stack GREY ESP32
+- M5Stack Station
+- M5Stack Timer CAM
+- M5Stack-ATOM
+- M5Stack-Core Ink
+- M5Stick-C
+- MGBOT IOTIK 32A
+- MGBOT IOTIK 32B
+- MH ET LIVE ESP32DevKIT
+- MH ET LIVE ESP32MiniKit
+- MagicBit
+- MakerAsia KB32-FT
+- MakerAsia Nano32
+- Microduino Core ESP32
+- Munich Labs RedPill ESP32-S3
+- Node32s
+- NodeMCU-32S
+- Noduino Quantum
+- ODROID-GO
+- OLIMEX ESP32-DevKit-LiPo
+- OLIMEX ESP32-EVB
+- OLIMEX ESP32-GATEWAY
+- OLIMEX ESP32-PRO
+- OLIMEX ESP32-PoE
+- OLIMEX ESP32-PoE-ISO
+- OROCA EduBot
+- Onehorse ESP32 Dev Module
+- ProtoCentral HealthyPi 4
+- Pycom GPy
+- Pycom LoPy
+- Pycom LoPy4
+- Pycom WiPy3
+- Qchip
+- S.ODI Ultra v1
+- SG-O AirMon
+- SQFMI Watchy v2.0
+- Seeed Studio XIAO ESP32C3
+- Silicognition wESP32
+- Smart Bee Motion
+- Smart Bee Motion Mini
+- Smart Bee Motion S3
+- Smart Bee S3
+- SparkFun ESP32 IoT RedBoard
+- SparkFun ESP32 MicroMod
+- SparkFun ESP32 Thing
+- SparkFun ESP32 Thing Plus
+- SparkFun ESP32 Thing Plus C
+- SparkFun ESP32-S2 Thing Plus
+- SparkFun LoRa Gateway 1-Channel
+- TAMC DPU ESP32
+- TAMC Termod S3
+- TTGO LoRa32-OLED V1
+- TTGO LoRa32-OLED V2
+- TTGO LoRa32-OLED v2.1.6
+- TTGO T-Beam
+- TTGO T-OI PLUS RISC-V ESP32-C3
+- TTGO T-Watch
+- TTGO T1
+- TTGO T7 V1.3 Mini32
+- TTGO T7 V1.4 Mini32
+- Trueverit ESP32 Universal IoT Driver
+- Trueverit ESP32 Universal IoT Driver MK II
+- Trueverit ESP32 Universal IoT Driver MK III
+- Turta IoT Node
+- Unexpected Maker FeatherS2
+- Unexpected Maker FeatherS2 Neo
+- Unexpected Maker FeatherS3
+- Unexpected Maker PROS3
+- Unexpected Maker RMP
+- Unexpected Maker TinyPICO
+- Unexpected Maker TinyS2
+- Unexpected Maker TinyS3
+- VintLabs ESP32 Devkit
+- WEMOS D1 MINI ESP32
+- WEMOS D1 R32
+- WEMOS LOLIN C3 Mini
+- WEMOS LOLIN D32
+- WEMOS LOLIN D32 PRO
+- WEMOS LOLIN S2 Mini
+- WEMOS LOLIN S2 PICO
+- WEMOS LOLIN S3
+- WEMOS LOLIN32
+- WEMOS LOLIN32 Lite
+- WeMos WiFi and Bluetooth Battery
+- Widora AIR
+- Wireless-Tag WT32-ETH01 Ethernet Module
+- XinaBox CW02
+- YeaCreate NSCREEN-32
+- microS2
+- oddWires IoT-Bus Io
+- oddWires IoT-Bus Proteus
+- u-blox NINA-W10 series
+- uPesy ESP32 Wroom DevKit
+- uPesy ESP32 Wrover DevKit
+- unPhone 7
+- unPhone 8
+- unPhone 9
+### Espressif 8266
+- 4D Systems gen4 IoD Range
+- Adafruit HUZZAH ESP8266
+- DigiStump Oak
+- ESP-Mx DevKit (ESP8285)
+- ESP-WROOM-02
+- ESPDuino (ESP-13 Module)
+- ESPectro Core
+- ESPino
+- ESPresso Lite 1.0
+- ESPresso Lite 2.0
+- Espressif ESP8266 ESP-12E
+- Espressif Generic ESP8266 ESP-01 1M
+- Espressif Generic ESP8266 ESP-01 512k
+- Espressif Generic ESP8266 ESP-07 1MB
+- Espressif Generic ESP8266 ESP-07S
+- Generic ESP8285 Module
+- Heltec Wifi kit 8
+- Invent One
+- Lifely Agrumino Lemon v4
+- NodeMCU 0.9 (ESP-12 Module)
+- NodeMCU 1.0 (ESP-12E Module)
+- Olimex MOD-WIFI-ESP8266(-DEV)
+- Phoenix 1.0
+- Phoenix 2.0
+- Schirmilabs Eduino WiFi
+- Sonoff Basic
+- Sonoff S20
+- Sonoff SV
+- Sonoff TH
+- SparkFun Blynk Board
+- SparkFun ESP8266 Thing
+- SparkFun ESP8266 Thing Dev
+- SweetPea ESP-210
+- ThaiEasyElec ESPino
+- WEMOS D1 R1
+- WeMos D1 ESP-WROOM-02
+- WeMos D1 R2 and mini
+- WeMos D1 mini Lite
+- WeMos D1 mini Pro
+- WiFi Slot
+- WiFiduino
+- WifInfo
+- Wio Link
+- Wio Node
+- XinaBox CW01
+### Freescale Kinetis
+- Ethernet IoT Starter Kit
+- Freescale Kinetis FRDM-K20D50M
+- Freescale Kinetis FRDM-K22F
+- Freescale Kinetis FRDM-K64F
+- Freescale Kinetis FRDM-K66F
+- Freescale Kinetis FRDM-K82F
+- Freescale Kinetis FRDM-KL05Z
+- Freescale Kinetis FRDM-KL25Z
+- Freescale Kinetis FRDM-KL27Z
+- Freescale Kinetis FRDM-KL43Z
+- Freescale Kinetis FRDM-KL46Z
+- Freescale Kinetis FRDM-KL82Z
+- Freescale Kinetis FRDM-KW24D512
+- Freescale Kinetis FRDM-KW41Z
+- Hexiwear
+- SEGGER IP Switch Board
+### Heltec CubeCell
+- Heltec CubeCell Capsule Solar Sensor (HTCC-AC02)
+- Heltec CubeCell-1/2AA Node (HTCC-AB02A)
+- Heltec CubeCell-Board (HTCC-AB01)
+- Heltec CubeCell-Board PRO (HTCC-AB03)
+- Heltec CubeCell-Board Plus (HTCC-AB02)
+- Heltec CubeCell-Board-V2 (HTCC-AB01-V2)
+- Heltec CubeCell-Capsule (HTCC-AC01)
+- Heltec CubeCell-GPS (HTCC-AB02S)
+- Heltec CubeCell-Module (HTCC-AM01)
+- Heltec CubeCell-Module Plus (HTCC-AM02)
+- Heltec CubeCell-Module-V2 (HTCC-AM01-V2)
+### Intel ARC32
+- Arduino/Genuino 101
+### Intel MCS-51 (8051)
+- CH559
+- Generic 8051
+- Generic 8052
+- Generic AT89S51
+- Generic AT89S52
+- Generic IAP12C5A62S2
+- Generic IAP15F106
+- Generic IAP15F206A
+- Generic IAP15F2K61S
+- Generic IAP15F2K61S2
+- Generic IAP15F413AD
+- Generic IAP15W105
+- Generic IAP15W1K29S
+- Generic IAP15W205S
+- Generic IAP15W413AS
+- Generic IAP15W413S
+- Generic IAP15W4K58S4
+- Generic IAP15W4K61S4
+- Generic IAP15W4K63S4
+- Generic IRC15F107W
+- Generic IRC15F2K63S2
+- Generic IRC15W107
+- Generic IRC15W1K31S
+- Generic IRC15W207S
+- Generic IRC15W415AS
+- Generic IRC15W415S
+- Generic ML51BB9AE
+- Generic ML51DB9AE
+- Generic ML51EB9AE
+- Generic ML51EC0AE
+- Generic ML51FB9AE
+- Generic ML51LD1AE
+- Generic ML51OB9AE
+- Generic ML51PB9AE
+- Generic ML51PC0AE
+- Generic ML51SD1AE
+- Generic ML51TB9AE
+- Generic ML51TC0AE
+- Generic ML51TC1AE
+- Generic ML51TD1AE
+- Generic ML51UB9AE
+- Generic ML51UC0AE
+- Generic ML51XB9AE
+- Generic ML54LD1AE
+- Generic ML54MD1AE
+- Generic ML54SD1AE
+- Generic ML56LD1AE
+- Generic ML56MD1AE
+- Generic ML56SD1AE
+- Generic MS51BA9AE
+- Generic MS51DA9AE
+- Generic MS51EC0AE
+- Generic MS51FB9AE
+- Generic MS51FC0AE
+- Generic MS51IA9AE
+- Generic MS51PC0AE
+- Generic MS51TC0AE
+- Generic MS51XB9AE
+- Generic MS51XB9BE
+- Generic MS51XC0BE
+- Generic N76E003
+- Generic N76E616
+- Generic N76E885
+- Generic N78E055
+- Generic N78E059
+- Generic N78E366
+- Generic N78E517
+- Generic N79E352
+- Generic N79E715
+- Generic N79E813
+- Generic N79E8132
+- Generic N79E814
+- Generic N79E815
+- Generic N79E822
+- Generic N79E823
+- Generic N79E824
+- Generic N79E825
+- Generic N79E843
+- Generic N79E8432
+- Generic N79E844
+- Generic N79E845
+- Generic N79E854
+- Generic N79E855
+- Generic N79E875
+- Generic STC12C5A08S2
+- Generic STC12C5A16S2
+- Generic STC12C5A32S2
+- Generic STC12C5A40S2
+- Generic STC12C5A48S2
+- Generic STC12C5A52S2
+- Generic STC12C5A56S2
+- Generic STC12C5A60S2
+- Generic STC15F100
+- Generic STC15F100W
+- Generic STC15F101
+- Generic STC15F101E
+- Generic STC15F101W
+- Generic STC15F102
+- Generic STC15F102E
+- Generic STC15F102W
+- Generic STC15F103
+- Generic STC15F103E
+- Generic STC15F103W
+- Generic STC15F104
+- Generic STC15F104E
+- Generic STC15F104W
+- Generic STC15F105
+- Generic STC15F105E
+- Generic STC15F105W
+- Generic STC15F201A
+- Generic STC15F201EA
+- Generic STC15F202A
+- Generic STC15F202EA
+- Generic STC15F203A
+- Generic STC15F203EA
+- Generic STC15F204A
+- Generic STC15F204EA
+- Generic STC15F205A
+- Generic STC15F205EA
+- Generic STC15F2K08S2
+- Generic STC15F2K16S2
+- Generic STC15F2K24AS
+- Generic STC15F2K24S2
+- Generic STC15F2K32S2
+- Generic STC15F2K40S2
+- Generic STC15F2K48S2
+- Generic STC15F2K52S2
+- Generic STC15F2K56S2
+- Generic STC15F2K60S2
+- Generic STC15F408AD
+- Generic STC15W100
+- Generic STC15W101
+- Generic STC15W102
+- Generic STC15W103
+- Generic STC15W104
+- Generic STC15W1K16S
+- Generic STC15W1K20S
+- Generic STC15W1K24S
+- Generic STC15W201S
+- Generic STC15W202S
+- Generic STC15W203S
+- Generic STC15W204S
+- Generic STC15W401AS
+- Generic STC15W402AS
+- Generic STC15W404AS
+- Generic STC15W404S
+- Generic STC15W408AS
+- Generic STC15W408S
+- Generic STC15W410S
+- Generic STC15W4K16S4
+- Generic STC15W4K32S4
+- Generic STC15W4K40S4
+- Generic STC15W4K48S4
+- Generic STC15W4K56S4
+- Generic STC89C516RD+
+- Generic STC89C51RC
+- Generic STC89C52RC
+- Generic STC89C53RC
+- Generic STC89C54RD+
+- Generic STC89C58RD+
+- Generic STC8A4K16S2A12
+- Generic STC8A4K32S2A12
+- Generic STC8A4K60S2A12
+- Generic STC8A4K64S2A12
+- Generic STC8A8K16D4
+- Generic STC8A8K16S4A12
+- Generic STC8A8K32D4
+- Generic STC8A8K32S4A12
+- Generic STC8A8K60D4
+- Generic STC8A8K60S4A12
+- Generic STC8A8K64D4
+- Generic STC8A8K64S4A12
+- Generic STC8C1K08
+- Generic STC8C1K12
+- Generic STC8C2K16S2
+- Generic STC8C2K16S4
+- Generic STC8C2K32S2
+- Generic STC8C2K32S4
+- Generic STC8C2K60S2
+- Generic STC8C2K60S4
+- Generic STC8C2K64S2
+- Generic STC8C2K64S4
+- Generic STC8F1K08
+- Generic STC8F1K08S
+- Generic STC8F1K08S2
+- Generic STC8F1K08S2A10
+- Generic STC8F1K17
+- Generic STC8F1K17S2
+- Generic STC8F2K08S2
+- Generic STC8F2K16S2
+- Generic STC8F2K16S4
+- Generic STC8F2K32S2
+- Generic STC8F2K32S4
+- Generic STC8F2K60S2
+- Generic STC8F2K60S4
+- Generic STC8F2K64S2
+- Generic STC8F2K64S4
+- Generic STC8G1K08
+- Generic STC8G1K08A
+- Generic STC8G1K08T
+- Generic STC8G1K12
+- Generic STC8G1K12A
+- Generic STC8G1K17
+- Generic STC8G1K17A
+- Generic STC8G1K17T
+- Generic STC8G2K16S2
+- Generic STC8G2K16S4
+- Generic STC8G2K32S2
+- Generic STC8G2K32S4
+- Generic STC8G2K60S2
+- Generic STC8G2K60S4
+- Generic STC8G2K64S2
+- Generic STC8G2K64S4
+- Generic STC8H04
+- Generic STC8H04A10
+- Generic STC8H1K08
+- Generic STC8H1K08S2
+- Generic STC8H1K08S2A10
+- Generic STC8H1K12
+- Generic STC8H1K16
+- Generic STC8H1K16S2
+- Generic STC8H1K16S2A10
+- Generic STC8H1K17
+- Generic STC8H1K24
+- Generic STC8H1K28
+- Generic STC8H1K32S2
+- Generic STC8H1K32S2A10
+- Generic STC8H1K33
+- Generic STC8H1K64S2A10
+- Generic STC8H2K32T
+- Generic STC8H2K48T
+- Generic STC8H2K60T
+- Generic STC8H2K64T
+- Generic STC8H3K32S2
+- Generic STC8H3K32S4
+- Generic STC8H3K48S2
+- Generic STC8H3K48S4
+- Generic STC8H3K60S2
+- Generic STC8H3K60S4
+- Generic STC8H3K64S2
+- Generic STC8H3K64S4
+- Generic STC8H4K32LCD
+- Generic STC8H4K32TLCD
+- Generic STC8H4K32TLR
+- Generic STC8H4K48LCD
+- Generic STC8H4K48TLCD
+- Generic STC8H4K48TLR
+- Generic STC8H4K60LCD
+- Generic STC8H4K60TLCD
+- Generic STC8H4K60TLR
+- Generic STC8H4K64LCD
+- Generic STC8H4K64TLCD
+- Generic STC8H4K64TLR
+- Generic STC8H8K32U
+- Generic STC8H8K48U
+- Generic STC8H8K60U
+- Generic STC8H8K64U
+- Generic W79E2051
+- Generic W79E4051
+- Generic W79E632
+- Generic W79E633
+- Generic W79E658
+- Generic W79E659
+- Generic W79E8213
+### Lattice iCE40
+- IceZUM Alhambra FPGA
+- Lattice iCEstick FPGA Evaluation Kit
+### Linux ARM
+- Raspberry Pi 1 Model B
+- Raspberry Pi 2 Model B
+- Raspberry Pi 3 Model B
+- Raspberry Pi Zero
+### Maxim 32
+- MAX32620FTHR
+- MAX32625MBED
+- MAX32625NEXPAQ
+- MAX32625PICO
+- Maxim ARM mbed Enabled Development Platform for MAX32600
+- Maxim Health Sensor Platform
+- Maxim MAX32630FTHR Application Platform
+- Maxim Wireless Sensor Node Demonstrator
+- SDT32620B
+- SDT32625B
+### Microchip PIC32
+- 4D Systems PICadillo 35T
+- DataStation Mini
+- Digilent Cerebot 32MX4
+- Digilent Cerebot 32MX7
+- Digilent OpenScope
+- Digilent chipKIT Cmod
+- Digilent chipKIT DP32
+- Digilent chipKIT MAX32
+- Digilent chipKIT MX3
+- Digilent chipKIT Pro MX4
+- Digilent chipKIT Pro MX7
+- Digilent chipKIT UNO32
+- Digilent chipKIT WF32
+- Digilent chipKIT WiFire
+- Digilent chipKIT uC32
+- Element14 chipKIT Pi
+- Fubarino Mini
+- Fubarino SD (1.5)
+- HelvePic32
+- HelvePic32
+- HelvePic32
+- HelvePic32 MX270
+- HelvePic32 Robot
+- HelvePic32 SMD MX270
+- MikroElektronika Clicker 2
+- MikroElektronika Flip N Click MZ
+- Mini 2.0
+- Olimex PIC32-PINGUINO
+- OpenBCI 32bit
+- PONTECH UAV100
+- Pic32 CUI32-Development Stick
+- Pontech NoFire
+- Pontech Quick240
+- RGB Station
+- SeeedStudio CUI32stem
+- UBW32 MX460
+- UBW32 MX795
+- chipKIT Lenny
+- chipKIT WiFire rev. C
+### Nordic nRF51
+- BBC micro:bit
+- BluzDK
+- Calliope mini
+- Nordic Beacon Kit (PCA20006)
+- Nordic nRF51 Dongle (PCA10031)
+- Nordic nRF51X22 Development Kit(PCA1000X)
+- OSHChip
+- RedBearLab BLE Nano 1.5
+- RedBearLab nRF51822
+- Seeed Tiny BLE
+- Sino:Bit
+- VNG VBLUNO51
+- Waveshare BLE400
+- ng-beacon
+### Nordic nRF52
+- 96Boards Nitrogen
+- Adafruit Bluefruit nRF52832 Feather
+- Adafruit CLUE nRF52840
+- Adafruit Feather Bluefruit Sense
+- Adafruit Feather nRF52840 Express
+- Adafruit LED Glasses Driver nRF52840
+- Arduino Nano 33 BLE
+- Arduino Nicla Sense ME
+- BBC micro:bit V2
+- BL652 Development Kit
+- BL653 Development Kit
+- BL654 Development Kit
+- Bluey nRF52832 IoT
+- Circuit Playground Bluefruit
+- Delta DFBM-NQ620
+- ElectronutLabs Blip
+- ElectronutLabs Papyr
+- Holyiot YJ-16019
+- ItsyBitsy nRF52840 Express
+- Laird Connectivity Pinnacle 100 DVK
+- Makerdiary nRF52832-MDK
+- Makerdiary nRF52840-MDK
+- Metro nRF52840 Express
+- Nordic Thingy:52 (nRF52-PCA20020)
+- Nordic nRF52-DK
+- Nordic nRF52833-DK
+- Nordic nRF52840-DK
+- Nordic nRF52840-DK (Adafruit BSP)
+- PHYTEC reel board
+- PHYTEC reel board v2
+- Particle Argon
+- Particle Boron
+- Particle Xenon
+- Raytac MDBT50Q-RX Dongle
+- RedBearLab BLE Nano 2
+- RedBearLab Blend 2
+- Ruuvi Tag
+- SDT52832B
+- Taida Century nRF52 mini board
+- VNG VBLUno52
+- decaWave DWM1001 Module Development Board
+- hackaBLE
+- u-blox BMD-345-EVAL
+- u-blox EVK-NINA-B1
+### NXP i.MX RT
+- NXP i.MX RT1010 Evaluation Kit
+- NXP i.MX RT1015 Evaluation Kit
+- NXP i.MX RT1020 Evaluation Kit
+- NXP i.MX RT1050 Evaluation Kit
+- NXP i.MX RT1060 Evaluation Kit
+- NXP i.MX RT1064 Evaluation Kit
+### NXP LPC
+- ARM mbed LPC11U24 (+CAN)
+- Bambino-210E
+- CQ Publishing TG-LPC11U35-501
+- CoCo-ri-Co!
+- DipCortex M3
+- EA LPC11U35 QuickStart Board
+- Embedded Artists LPC4088 Display Module
+- Embedded Artists LPC4088 QuickStart Board
+- LPCXpresso11U68
+- LPCXpresso824-MAX
+- MicroNFCBoard
+- NGX Technologies BlueBoard-LPC11U24
+- NXP LPC11C24
+- NXP LPC11U34
+- NXP LPC11U37
+- NXP LPC800-MAX
+- NXP LPCXpresso1549
+- NXP LPCXpresso54114
+- NXP LPCXpresso54608
+- NXP LPCXpresso55S16
+- NXP LPCXpresso55S69
+- NXP mbed LPC11U24
+- NXP mbed LPC1768
+- Outrageous Circuits mBuino
+- Seeed Arch GPRS V2
+- Seeed Arch Pro
+- Seeed Xadow M0
+- Smeshlink xbed LPC1768
+- Solder Splash Labs DipCortex M0
+- Switch Science mbed LPC1114FN28
+- Switch Science mbed LPC824
+- mBuino
+- u-blox C027
+- y5 LPC11U35 mbug
+### OpenHW Group
+- Digilent Nexys A7
+### Raspberry Pi RP2040
+- Arduino Nano RP2040 Connect
+- Raspberry Pi Pico
+### RISC-V GAP
+- GAPuino GAP8
+### Shakti
+- Artix-7 35T Arty FPGA Evaluation Kit
+- Arty A7-100: Artix-7 FPGA Development Board
+- Parashu on Artix-7 100T Arty FPGA Evaluation Kit
+- Pinaka on Artix-7 35T Arty FPGA Evaluation Kit
+- Vajra on Arty A7-100: Artix-7 FPGA Development Board
+### SiFive
+- Arty FPGA Dev Kit
+- HiFive Unleashed
+- HiFive1
+- HiFive1 Rev B
+- SparkFun RED-V RedBoard
+- SparkFun RED-V Thing Plus
+### Silicon Labs EFM32
+- EFM32GG-STK3700 Giant Gecko
+- EFM32LG-STK3600 Leopard Gecko
+- EFM32WG-STK3800 Wonder Gecko
+- EFM32ZG-STK3200 Zero Gecko
+- SLSTK3400A USB-enabled Happy Gecko
+- SLSTK3401A Pearl Gecko PG1
+- SLSTK3701A Giant Gecko S1
+- Thunderboard Sense 2 Sensor-to-Cloud Advanced IoT
+### ST STM32
+- 1Bitsy
+- 32F412GDISCOVERY
+- 32F723EDISCOVERY
+- 3D Printer Controller
+- 3D Printer control board
+- 3D printer controller
+- 3DP001V1 Evaluation board for 3D printer
+- 96Boards Argonkey (STEVAL-MKI187V1)
+- 96Boards B96B-F446VE
+- 96Boards Neonkey
+- 96Boards Neonkey
+- ACSIP S76S
+- Adafruit Feather STM32F405
+- AfroFlight Rev5 (8MHz)
+- Arduino Opta
+- Arduino Portenta H7 (M4 core)
+- Arduino Portenta H7 (M7 core)
+- Armstrap Eagle 1024
+- Armstrap Eagle 2048
+- Armstrap Eagle 512
+- Big Tree Tech EBB42 V1.1
+- Black STM32F407VE
+- Black STM32F407VG
+- Black STM32F407ZE
+- Black STM32F407ZG
+- BlackPill F103C8
+- BlackPill F103C8 (128k)
+- BlackPill F303CC
+- Blue STM32F407VE Mini
+- BluePill F103C6
+- BluePill F103C8
+- BluePill F103C8 (128k)
+- BluesWireless Swan R5
+- Cicada-L082CZ
+- Core board F401RCT6
+- Cricket-L082CZ
+- Demo F030F4
+- DevEBox H743VITX
+- DevEBox H750VBTX
+- Econode-L082CZ
+- Electrosmith Daisy
+- Electrosmith Daisy Patch SM
+- Electrosmith Daisy Petal SM
+- Elektor LoRa Node Core F072C8 (128 kB)
+- Elektor LoRa Node Core F072C8 (64 kB)
+- Espotel LoRa Module
+- F407VG
+- FK407M1
+- FYSETC S6
+- Gnat-L082CZ
+- Grasshopper-L082CZ
+- L476DMW1K
+- M200 V2
+- M300
+- MKR Sharky
+- MTS Dragonfly
+- Malyan M200 V1
+- Maple
+- Maple (RET6)
+- Maple Mini Bootloader 2.0
+- Maple Mini Original
+- Mbed Connect Cloud
+- Microduino Core STM32 to Flash
+- Microsoft Azure IoT Development Kit (MXChip AZ3166)
+- MultiTech mDot
+- MultiTech mDot F411
+- MultiTech xDot
+- N2+
+- NAMote72
+- Nucleo G070RB
+- Nucleo G071RB
+- Nucleo G431KB
+- Nucleo G431RB
+- Nucleo G474RE
+- OLIMEXINO-STM32
+- Olimex OLIMEXINO-STM32F3
+- Olimex STM32-H103
+- Olimex STM32-P405
+- P-Nucleo WB55RG
+- PYBSTICK26 Duino
+- PYBStick 26 Pro
+- PYBStick Lite 26
+- PYBStick Standard 26
+- Piconomix PX-HER0
+- PrntrBoard V2
+- RAK811 LoRa Tracker
+- RAK811 LoRa Tracker
+- RHF76 052
+- RushUp Cloud-JAM
+- RushUp Cloud-JAM L4
+- ST 32F3348DISCOVERY
+- ST 32F401CDISCOVERY
+- ST 32F411EDISCOVERY
+- ST 32F413HDISCOVERY
+- ST 32F429IDISCOVERY
+- ST 32F469IDISCOVERY
+- ST 32F746GDISCOVERY
+- ST 32F769IDISCOVERY
+- ST 32L0538DISCOVERY
+- ST 32L100DISCOVERY
+- ST 32L476GDISCOVERY
+- ST 32L496GDISCOVERY
+- ST B-G431B-ESC1 Discovery
+- ST B-L475E-IOT01A Discovery kit
+- ST B-U585I-IOT02A Discovery
+- ST DISCO-L072CZ-LRWAN1
+- ST Discovery F072RB
+- ST NUCLEO-G031K8
+- ST Nucleo F030R8
+- ST Nucleo F031K6
+- ST Nucleo F042K6
+- ST Nucleo F070RB
+- ST Nucleo F072RB
+- ST Nucleo F091RC
+- ST Nucleo F103RB
+- ST Nucleo F207ZG
+- ST Nucleo F302R8
+- ST Nucleo F303K8
+- ST Nucleo F303RE
+- ST Nucleo F303ZE
+- ST Nucleo F334R8
+- ST Nucleo F401RE
+- ST Nucleo F410RB
+- ST Nucleo F411RE
+- ST Nucleo F412ZG
+- ST Nucleo F413ZH
+- ST Nucleo F429ZI
+- ST Nucleo F439ZI
+- ST Nucleo F446RE
+- ST Nucleo F446ZE
+- ST Nucleo F722ZE
+- ST Nucleo F746ZG
+- ST Nucleo F756ZG
+- ST Nucleo F767ZI
+- ST Nucleo G0B1RE
+- ST Nucleo H723ZG
+- ST Nucleo H743ZI
+- ST Nucleo H745ZI-Q
+- ST Nucleo H753ZI
+- ST Nucleo L010RB
+- ST Nucleo L011K4
+- ST Nucleo L031K6
+- ST Nucleo L053R8
+- ST Nucleo L073RZ
+- ST Nucleo L152RE
+- ST Nucleo L412KB
+- ST Nucleo L412RB-P
+- ST Nucleo L432KC
+- ST Nucleo L433RC-P
+- ST Nucleo L452RE
+- ST Nucleo L476RG
+- ST Nucleo L486RG
+- ST Nucleo L496ZG
+- ST Nucleo L496ZG-P
+- ST Nucleo L4R5ZI
+- ST Nucleo L552ZE-Q
+- ST Nucleo U575ZI-Q
+- ST Nucleo WL55JC
+- ST STM32F0308DISCOVERY
+- ST STM32F0DISCOVERY
+- ST STM32F3DISCOVERY
+- ST STM32F4DISCOVERY
+- ST STM32G0316-DISCO
+- ST STM32G071B Discovery
+- ST STM32L073Z-EVAL
+- ST STM32L4+ Discovery kit IoT node
+- ST STM32LDISCOVERY
+- ST STM32VLDISCOVERY
+- ST Sensor Node
+- STEVAL-FCU001V1 Flight controller unit evaluation board
+- STM32-E407
+- STM32-H407
+- STM3210C-EVAL
+- STM32373C-EVAL
+- STM32F072-EVAL
+- STM32F103C4 (6k RAM. 16k Flash)
+- STM32F103C6 (10k RAM. 32k Flash)
+- STM32F103C8 (20k RAM. 64k Flash)
+- STM32F103CB (20k RAM. 128k Flash)
+- STM32F103R4 (6k RAM. 16k Flash)
+- STM32F103R6 (10k RAM. 32k Flash)
+- STM32F103R8 (20k RAM. 64 Flash)
+- STM32F103RB (20k RAM. 128k Flash)
+- STM32F103RC (48k RAM. 256k Flash)
+- STM32F103RD (64k RAM. 384k Flash)
+- STM32F103RE (64k RAM. 512k Flash)
+- STM32F103RF (96k RAM. 768k Flash)
+- STM32F103RG (96k RAM. 1024k Flash)
+- STM32F103T4 (6k RAM. 16k Flash)
+- STM32F103T6 (10k RAM. 32k Flash)
+- STM32F103T8 (20k RAM. 64k Flash)
+- STM32F103TB (20k RAM. 128k Flash)
+- STM32F103V8 (20k RAM. 64k Flash)
+- STM32F103VB (20k RAM. 128k Flash)
+- STM32F103VC (48k RAM. 256k Flash)
+- STM32F103VD (64k RAM. 384k Flash)
+- STM32F103VE (64k RAM. 512k Flash)
+- STM32F103VF (96k RAM. 768k Flash)
+- STM32F103VG (96k RAM. 1024k Flash)
+- STM32F103ZC (48k RAM. 256k Flash)
+- STM32F103ZD (64k RAM. 384k Flash)
+- STM32F103ZE (64k RAM. 512k Flash)
+- STM32F103ZF (96k RAM. 768k Flash)
+- STM32F103ZG (96k RAM. 1024k Flash)
+- STM32F303CB (32k RAM. 128k Flash)
+- STM32F373RC (32k RAM. 256k Flash)
+- STM32F401CB (64k RAM. 128k Flash)
+- STM32F401CC (64k RAM. 256k Flash)
+- STM32F401CD (96k RAM. 384k Flash)
+- STM32F401CE (96k RAM. 512k Flash)
+- STM32F401RB (64k RAM. 128k Flash)
+- STM32F401RC (64k RAM. 256k Flash)
+- STM32F401RD (96k RAM. 384k Flash)
+- STM32F401RE (96k RAM. 512k Flash)
+- STM32F405RG (128k RAM. 1024k Flash)
+- STM32F407IG (192k RAM. 1024k Flash)
+- STM32F407VE (192k RAM. 512k Flash)
+- STM32F407VG (128k RAM. 1024k Flash)
+- STM32F410C8 (32k RAM. 64k Flash)
+- STM32F410CB (32k RAM. 128k Flash)
+- STM32F410R8 (32k RAM. 64k Flash)
+- STM32F410RB (32k RAM. 128k Flash)
+- STM32F411CC (128k RAM. 256k Flash)
+- STM32F411CE (128k RAM. 512k Flash)
+- STM32F411RC (128k RAM. 256k Flash)
+- STM32F411RE (128k RAM. 512k Flash)
+- STM32F412CE (256k RAM. 512k Flash)
+- STM32F412CG (256k RAM. 1024k Flash)
+- STM32F412RE (256k RAM. 512k Flash)
+- STM32F412RG (256k RAM. 1024k Flash)
+- STM32F413CG (320k RAM. 1024k Flash)
+- STM32F413CH (320k RAM. 1536k Flash)
+- STM32F413RG (320k RAM. 1024k Flash)
+- STM32F413RH (320k RAM. 1536k Flash)
+- STM32F415RG (128k RAM. 1024k Flash)
+- STM32F417VE (128k RAM. 512k Flash)
+- STM32F417VG (128k RAM. 1024k Flash)
+- STM32F423CH (320k RAM. 1536k Flash)
+- STM32F423RH (320k RAM. 1536k Flash)
+- STM32F446RC (128k RAM. 256k Flash)
+- STM32F446RE (128k RAM. 512k Flash)
+- STM32F4Stamp F405
+- STM32F7508-DK
+- STM32H735G-DK Discovery kit
+- STM32H747I-DISCO
+- STorM32 BGC v1.31 RC
+- Seeed Arch Max
+- Seeed Wio 3G
+- SensorTile.box
+- Sigma IC AGAFIA SG0
+- Sparky V1 F303
+- ThunderPack v1.0
+- ThunderPack v1.1+
+- Tiny STM103T
+- VAkE v1.0
+- VCCGND F103ZET6 Mini
+- VCCGND F407ZGT6 Mini
+- Waveshare Open103Z
+- WeAct Studio BlackPill V2.0 (STM32F401CC)
+- WeAct Studio BlackPill V2.0 (STM32F411CE)
+- WeAct Studio BlackPill V3.0 (STM32F401CE)
+- WeAct Studio MiniSTM32H743VITX
+- WeAct Studio MiniSTM32H750VBTX
+- Wraith V1 ESC
+- sakura.io Evaluation Board
+- u-blox C030-N211 IoT Starter Kit
+- u-blox C030-R410M IoT
+- u-blox C030-U201 IoT Starter Kit
+- u-blox EVK-ODIN-W2
+- u-blox ODIN-W2
+### ST STM8
+- NUCLEO-8S207K8
+- NUCLEO-8S208RB
+- ST STM8S-DISCOVERY
+- ST STM8S003F3 chip
+- ST STM8S103F3 Breakout Board
+- ST STM8S105K4T6 Breakout Board
+- sduino MB (STM8S208MBT6B)
+- sduino UNO (STM8S105K6)
+### Teensy
+- SparkFun MicroMod Teensy
+- Teensy 2.0
+- Teensy 3.0
+- Teensy 3.1 / 3.2
+- Teensy 3.5
+- Teensy 3.6
+- Teensy 4.0
+- Teensy 4.1
+- Teensy LC
+- Teensy++ 2.0
+### TI MSP430
+- TI FraunchPad MSP-EXP430FR5739LP
+- TI LaunchPad MSP-EXP430F5529LP
+- TI LaunchPad MSP-EXP430FR2311LP
+- TI LaunchPad MSP-EXP430FR2355LP
+- TI LaunchPad MSP-EXP430FR2433LP
+- TI LaunchPad MSP-EXP430FR2476LP
+- TI LaunchPad MSP-EXP430FR4133LP
+- TI LaunchPad MSP-EXP430FR5969LP
+- TI LaunchPad MSP-EXP430FR5994LP
+- TI LaunchPad MSP-EXP430FR6989LP
+- TI LaunchPad MSP-EXP430G2 w/ MSP430G2231
+- TI LaunchPad MSP-EXP430G2 w/ MSP430G2452
+- TI LaunchPad MSP-EXP430G2553LP
+### TI TIVA
+- TI LaunchPad (Stellaris) w/ lm4f120 (80MHz)
+- TI LaunchPad (Tiva C) w/ tm4c123 (80MHz)
+- TI LaunchPad (Tiva C) w/ tm4c129 (120MHz)
+### WIZNet W7500
+- WIZwiki-W7500
+- WIZwiki-W7500ECO
+- WIZwiki-W7500P
