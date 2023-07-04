@@ -46,7 +46,7 @@ public:
     //************************ описание параметров ***********************/
 
     // бинарные показания (например: 0-вкл, 1-выкл)
-    MWOS_PARAM(0, valueBin, mwos_param_bits1, mwos_param_sensor, mwos_param_storage_no, sensorsCount);
+    MWOS_PARAM(0, valueBin, mwos_param_bits1, mwos_param_sensor + mwos_param_readonly, mwos_param_storage_no, sensorsCount);
     //MWOS_PARAM(1,sensor_pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom,sensorsCount);  // порты
     // фильтр переключения бинарного значения [сек/10] (кратковременные переключения, меньше этого значения - игнорируются)
     MWOS_PARAM(2, binFilter, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
@@ -98,12 +98,14 @@ public:
         return MWOSModule::getValue(param, arrayIndex); // отправим значение из EEPROM
     }
 
+    bool getValueBool(int16_t arrayIndex= 0) {
+        return getValue(&p_valueBin,arrayIndex);
+    }
+
     virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex= 0) {
         if (param==&p_valueBin) return;
-        if (!param->IsReadOnly()) { // параметр не имеет флага readonly
-            saveValue(value, param, arrayIndex); // сохраним в EEPROM
-            onInit(); // обновим настройки
-        }
+        MWOSModule::setValue(value,param,arrayIndex);  // сохраним в хранилище
+        onInit(); // обновим настройки
     }
 
     /***

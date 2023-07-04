@@ -24,7 +24,7 @@ public:
      * Поддерживает только обращение к параметрам int32
      */
     MWOSNet64bit() : MWOSModule((char *) F("net")) {
-
+        moduleType=ModuleType::MODULE_NET;
     }
 
     /***

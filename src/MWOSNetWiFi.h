@@ -31,6 +31,13 @@
 #endif
 #include "MWAsyncClient.h"
 #include "MWServerWiFi.h"
+#include "core/net/MWOSNetIP.h"
+#include <WiFiClientSecure.h>
+
+#ifdef ESP_PLATFORM
+// если необходимо использовать SSL-подключение (только для платформы ESP) пока не отлажено!!!
+//#define SSL_CERTIFICATE_USE
+#endif
 
 #ifndef MWOW_AP_AFTER_NORECONNECTS
 #define	MWOW_AP_AFTER_NORECONNECTS 3	// через сколько неудачных подключений к сети WiFi включать режим сервера настроек (если не задан режим MWOS_NO_WIFI_AP_IF_DONT_CONNECT)
@@ -68,14 +75,10 @@
 #define MWOS_SERVER_PORT 8080
 #endif
 
-#ifndef MWOS_SEND_BUFFER_SIZE
-#define MWOS_SEND_BUFFER_SIZE 2048 // размер буффера отправки для сетевого устройства
-#endif
-
 const char * server_ssid = MWOS_WIFI_NAME_ID;
 const char * server_password = MWOS_WIFI_PASS;
 
-class MWOSNetWiFi : public MWOSNetDevice {
+class MWOSNetWiFi : public MWOSNetIP {
 public:
 
     MWServerWiFi * server=NULL;
@@ -93,11 +96,11 @@ public:
     String passWiFi=MWOS_TO_WIFI_PASS;
 
 
-    MWOSNetWiFi() : MWOSNetDevice() {
+    MWOSNetWiFi() : MWOSNetIP() {
     }
 
     virtual void onInit() {
-        MWOSNetDevice::onInit();
+        MWOSNetIP::onInit();
 #ifdef MWOS_BUTTON_PIN_WIFI_AP
         if (digitalRead(MWOS_BUTTON_PIN_WIFI_AP)==needValueButtonAp) startWiFiAp();
 		else
@@ -145,7 +148,7 @@ public:
 			}
 		}
 #endif
-        MWOSNetDevice::onUpdate();
+        MWOSNetIP::onUpdate();
     }
 
     virtual void clearConfig() {
@@ -159,19 +162,50 @@ public:
             startServer();
             connect_timeout.start(MW_ServerWiFi_Minutes*600);
         } else {
+#ifdef SSL_CERTIFICATE_USE
             if (!_stream) {
-                MWAsyncClient * client=new MWAsyncClient(MWOS_SEND_BUFFER_SIZE);
-                //WiFiClientSecure * client=new WiFiClientSecure();
-                //client.setCACert(test_root_ca); // задать сертификат SSL
-                _stream=client;
-                client->setTimeout(6000); // таймаут 5 сек, чтобы успеть сбросить вачдог в 8 сек
-                MW_LOG_MODULE(this);  MW_LOG(F("MWOSController set stream: ")); MW_LOG_LN((uint16_t) MWOS_SEND_BUFFER_SIZE);
+                connectToServerSSH();
             }
-            ((MWAsyncClient *) _stream)->connect(MWOS_SERVER_HOST,MWOS_SERVER_PORT); // подключимся к сокет-серверу
-            connect_timeout.start(50); // следующая попытка только через 5 сек
-            MWOSNetDevice::connectToServer();
+#endif
+            MWOSNetIP::connectToServer();
         }
     }
+
+#ifdef SSL_CERTIFICATE_USE
+    void connectToServerSSH() { // подключиться к серверу с сертификатом
+
+        // root CA can be downloaded in:
+        const char* rootCABuff = \
+"-----BEGIN CERTIFICATE-----\n" \
+"MIIHQjCCBiqgAwIBAgIMS3iMfVp4EAbPgpKIMA0GCSqGSIb3DQEBCwUAMEwxCzAJ\n" \
+"aNVAZFD5XHvXlFcKIX+8ag0OYVV/pRmZPvDked7bZfh/CccGqzI=\n" \
+"-----END CERTIFICATE-----\n";
+
+        // Fill with your certificate.pem.crt with LINE ENDING
+        const char* certificateBuff = \
+"-----BEGIN CERTIFICATE-----\n"\
+"MIIFFDCCAvwCAQEwDQYJKoZIhvcNAQELBQAwGjEYMBYGA1UEAwwPKi52b3Njb20u\n"\
+"MtLisw2vMm0=\n"\
+"-----END CERTIFICATE-----\n";
+
+        // Fill with your private.pem.key with LINE ENDING
+        const char* privateKeyBuff = \
+"-----BEGIN RSA PRIVATE KEY-----\n"\
+"MIIJKAIBAAKCAgEAv/1lXMmEweYaEad+Rt5FV6mA+9VPWIFzps/Rzv1aKugoRX6E\n"\
+"15v8jUbtrtkPAIvTdNxzP0y0wxXLNLWiw4JeXkC9t7B3/aQss2fYLFK3zrw=\n"\
+"-----END RSA PRIVATE KEY-----\n";
+
+        WiFiClientSecure * client=new WiFiClientSecure();
+        client->setInsecure(); // без сертификата
+        //client->setCACert(rootCABuff); // задать корневой сертификат
+        //client->setCertificate(certificateBuff); // for client verification
+        //client->setPrivateKey(privateKeyBuff);  // for client verification
+
+        _stream=client;
+        client->setTimeout(6000); // таймаут 5 сек, чтобы успеть сбросить вачдог в 8 сек
+        MW_LOG_MODULE(this);  MW_LOG(F("WiFiClientSecure set stream: ")); MW_LOG_LN((uint16_t) MWOS_SEND_BUFFER_SIZE);
+    }
+#endif
 
     virtual bool isConnectedServer() { // есть подключение к серверу?
         if (ap_mode) {
@@ -186,7 +220,7 @@ public:
             }
             return false;
         }
-        return ((MWAsyncClient *) _stream)->connected();
+        return MWOSNetIP::isConnectedServer();
     }
 
     virtual void startNet() { // аппаратно включить сеть
@@ -205,24 +239,15 @@ public:
         return (statusWiFi==WL_CONNECTED);
     }
 
-    void disconnect() {
-        if (_stream!=NULL) {
-            if (((MWAsyncClient *) _stream)->connected()) ((MWAsyncClient *) _stream)->stop(); // разорвем соединение, чтобы начать его заново
-            MW_LOG_MODULE(this); MW_LOG_LN(F("Unset client"));
-            //delete _stream;
-            //_stream=NULL;
-        }
-    }
-
     virtual void closeNet() { // закрыть подключение к сети
         disconnect();
         stopWiFiAP();
         stopWiFi();
-        MWOSNetDevice::closeNet();
+        MWOSNetIP::closeNet();
     }
 
     virtual void onDisconnect() {
-        MWOSNetDevice::onDisconnect();
+        MWOSNetIP::onDisconnect();
 #ifndef	MWOS_NO_WIFI_AP_IF_DONT_CONNECT
         countWiFiNoConnect++;
         MW_LOG_MODULE(this); MW_LOG(F("WiFiNoConnects: ")); MW_LOG_LN(countWiFiNoConnect);

@@ -181,13 +181,12 @@ public:
     }
 
     virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex= 0) {
-        MW_LOG_MODULE(this); MW_LOG(F("setValue: ")); MW_LOG_PROGMEM(param->name); MW_LOG(':'); MW_LOG(arrayIndex); MW_LOG('='); MW_LOG_LN((int32_t) v);
+        MW_LOG_MODULE(this,arrayIndex); MW_LOG(F("setValue: ")); MW_LOG_LN((int32_t) v);
         if (param==&p_speed && v==0) restart();
-        else
-            if (!param->IsReadOnly()) { // параметр не имеет флага readonly
-                saveValue(v, param, arrayIndex); // сохраним в EEPROM
-                onInit(); // обновим настройки
-            }
+        else {
+            MWOSModule::setValue(v,param,arrayIndex);  // сохраним в хранилище
+            onInit(); // обновим настройки
+        }
     }
 
     virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex=0) {

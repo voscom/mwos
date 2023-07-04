@@ -4,7 +4,7 @@
 
 Характеристики:
 
-- [ ] ESP32S3 - 72MHz, USB, 20Kb ROM, 64Kb/128Kb SRAM, 31 backup registers in RTC, 26 programmable GPIOs
+- [ ] STM32F103C8/B - 72MHz, USB, 20Kb ROM, 64Kb/128Kb FLASH, 31 backup registers in RTC, 26 programmable GPIOs
 
 
 - 26 портов (пододящие для ключей - 16шт и цифровых входов - 15шт, аналоговых входов - 10шт)

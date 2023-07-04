@@ -5,6 +5,7 @@
 import os
 import os.path
 import shutil
+import time
 Import("env")
 platform=env["PLATFORM"]
 # BOARD можно задать конкретную строку. По умолчанию - берет board из platformio.ini
@@ -39,7 +40,13 @@ if os.path.isdir("lib/mwos"):
 
 else:
     os.system("git -C ./.pio/libdeps/"+platform+"/mwos log -1 \"--format=format:#define GIT_REVISION_MWOS \\\"%H\\\"%n\" HEAD > version.h")
-os.system("git log -1 \"--format=format:#define GIT_REVISION_PROJ \\\"%H\\\"%n\" HEAD >> version.h")
+
+if os.path.isdir(".git"):
+    os.system("git log -1 \"--format=format:#define GIT_REVISION_PROJ \\\"%H\\\"%n\" HEAD >> version.h")
+else:
+    s='#define GIT_REVISION_PROJ "t'+str(time.time())+'"'
+    with open('version.h', 'a') as f:
+        f.write(s)
 
 env.Append(CPPDEFINES=[
     ("BOARD", env.StringifyMacro(board)),

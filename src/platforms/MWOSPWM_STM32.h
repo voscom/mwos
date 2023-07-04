@@ -55,7 +55,8 @@ public:
     }
 
     virtual void restart() {
-        MWOSRegulator::restart();
+        //MWOSRegulator::restart();
+        MW_LOG_MODULE(this); MW_LOG(F("STM32 quick restart")); MW_LOG(_value); MW_LOG('/'); MW_LOG_LN(_value2);
         tim->setOverflow(_value, HERTZ_FORMAT);
         tim->refresh();
     }

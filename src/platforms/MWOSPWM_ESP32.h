@@ -55,9 +55,6 @@ public:
         ledcWrite(_channel, _value2); // зададим значение ШИМ
     }
 
-    virtual void restart() {
-        MWOSRegulator::restart();
-    }
 
 
 };

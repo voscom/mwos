@@ -80,10 +80,10 @@ public:
 
     /***
      * Отправить на сервер хендшейк (не проверяет переполнение буффера, потому что отправляется в начале сессии)
-     * @return  Размер имени проекта + 39 байт
+     * @return  Размер имени проекта + 40 байт
      */
     uint16_t writeHandshake(uint32_t cid) {
-        if (this->availableForWrite()<40) {
+        if (this->availableForWrite()<44) {
             //write(0);
             return 0;
         }
@@ -98,6 +98,7 @@ public:
         size+=write('_'); // 29
         size+=write_progmem_str((char *) git_hash_mwos,8); // 37 версия mwos
         size+=write(0); // 39 конец строки
+        size+=write(mwos.storagesMask); // 41 состояния хранилищ
         size+=sendEndBlock();
         return size;
     }
@@ -163,14 +164,15 @@ public:
         while (sendModule!=NULL) {
             if (sendParam==NULL) { // сначала отправим данные модуля
                 // {имя} + {uint8 #0} + {uint16 id} + {uint16 count}
-                int16_t moduleFormatSize= sendModule->nameSize()+5;
+                int16_t moduleFormatSize= sendModule->nameSize()+6;
                 if (availableForWrite()<=moduleFormatSize) { // нет места для отправки модуля
                     return;
                 }
                 sendModule->printName(this); // имя
                 write(0); // 1 конец строки
                 writeUInt16(sendModule->id); // 3 id модуля
-                writeUInt16(sendModule->paramsCount); //  5 количество параметров
+                write(sendModule->moduleType); // 4 тип модуля
+                writeUInt16(sendModule->paramsCount); //  6 количество параметров
                 sendParam=(MWOSParam *) sendModule->child;
             }
             // отправим данные параметров
@@ -211,7 +213,7 @@ public:
             if (sendModule->changedMask.haveSetBits()) { // только, если есть установленные биты изменения параметров для модуля
                 while (sendParam!=NULL) {
                     while (sendParamIndex < sendParam->arrayCount()) {
-                        if (sendModule->IsParamChanged(sendParam, sendParamIndex)) {
+                        if (sendModule->IsParamChanged(sendParam, sendParamIndex) && !sendParam->IsGroup(mwos_param_secret)) {
                             if ((int16_t) sendParam->byteSize(false) + 14 < availableForWrite()) {
                                 // отправим значение
                                 MW_LOG(F("sendValues: ")); MW_LOG(sendModule->id); MW_LOG(':'); MW_LOG(sendParam->id); MW_LOG(':'); MW_LOG_LN(sendParamIndex);
@@ -223,9 +225,9 @@ public:
                                     write(block[i]);
                                 }
                                 sendEndBlock(); // 14
-                                sendModule->SetParamChanged(sendParam, sendParamIndex, false); // сбросим бит отправки
                             } else return; // нет места для отправки блока
                         }
+                        sendModule->SetParamChanged(sendParam, sendParamIndex, false); // сбросим бит отправки
                         sendParamIndex++;
                     }
                     ToSendParam(sendParam->next); // следующий параметр

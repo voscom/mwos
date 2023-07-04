@@ -145,9 +145,6 @@ public:
     }
 
     virtual void connectToServer() { // начать подключение к серверу
-#ifdef MWOS_SERVER_HOST
-        MW_LOG_MODULE(this); MW_LOG(F("connect to server: ")); MW_LOG_ADDR(MWOS_SERVER_HOST,MWOS_SERVER_PORT);
-#endif
     }
 
     virtual bool isConnectedServer() { // есть подключение к серверу?

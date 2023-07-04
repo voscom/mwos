@@ -81,7 +81,11 @@ public:
         return MWOSSensorBase<sensorsCount>::getValue(param, arrayIndex); // отправим значение из EEPROM
     }
 
-   virtual bool readBoolValue(uint16_t arrayIndex) {
+    int64_t getValueAnalog(int16_t arrayIndex= 0) {
+        return getValue(&p_value,arrayIndex);
+    }
+
+    virtual bool readBoolValue(uint16_t arrayIndex) {
        if (_sensor_digital) return readDigitalValue(arrayIndex); // это бинарный датчик - просто считам бинарное значение
        int32_t newValue = readAnalogValue(arrayIndex);
        if (getErrorCode()!=0) { // была ошибка чтения

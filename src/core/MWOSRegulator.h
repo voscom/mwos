@@ -13,10 +13,10 @@ class MWOSRegulator : public MWOSModule {
 public:
 
     // режим 0-вкл, 1-выкл
-    MWOS_PARAM(0, mode, mwos_param_bits1, mwos_param_control, mwos_param_storage_no, 1);
+    MWOS_PARAM(0, turn, mwos_param_bits1, mwos_param_control, mwos_param_storage_rtc, 1);
     // значение напряжения (или частоты)
     MWOS_PARAM(1, value, mwos_param_uint32, mwos_param_option, mwos_param_storage_eeprom, 1);
-    // значение напряжения (или частоты)
+    // значение скваженности
     MWOS_PARAM(2, value2, mwos_param_uint32, mwos_param_option, mwos_param_storage_eeprom, 1);
     // порт
     MWOS_PARAM(3, pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
@@ -27,7 +27,7 @@ public:
     bool started= false;
 
     MWOSRegulator() : MWOSModule((char *) F("regulator")) {
-        AddParam(&p_mode);
+        AddParam(&p_turn);
         AddParam(&p_value);
         AddParam(&p_value2);
         AddParam(&p_pin);
@@ -43,12 +43,17 @@ public:
         _pin=loadValue(_pin, &p_pin);
         _value=loadValue(_value, &p_value);
         _value2=loadValue(_value2, &p_value2);
+
     }
 
 
     virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex= 0) {
-        MW_LOG_MODULE(this); MW_LOG(F("setValue: ")); MW_LOG_PROGMEM(param->name); MW_LOG(':'); MW_LOG(arrayIndex); MW_LOG('='); MW_LOG_LN((int32_t) v);
-        if (param==&p_mode) {
+        MW_LOG_MODULE(this,arrayIndex); MW_LOG(F("setValue: ")); MW_LOG_LN((int32_t) v);
+        if (param==&p_turn) {
+            if (v==2) {
+                if (started) v=0;
+                else v=1;
+            }
             if (v==0) {
                 stop();
                 started= false;
@@ -76,17 +81,18 @@ public:
 
     virtual void stop() {
         MW_LOG_MODULE(this); MW_LOG_LN(F("stop"));
-
+        started= false;
     }
 
     virtual void start() {
         MW_LOG_MODULE(this); MW_LOG(F("start")); MW_LOG(_value); MW_LOG('/'); MW_LOG_LN(_value2);
-
+        started= true;
     }
 
     virtual void restart() {
         MW_LOG_MODULE(this); MW_LOG(F("restart")); MW_LOG(_value); MW_LOG('/'); MW_LOG_LN(_value2);
-
+        if (started) stop();
+        start();
     }
 
 

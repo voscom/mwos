@@ -84,7 +84,9 @@ public:
      * @param arrayIndex Номер индекса в массиве значений параметра (если это массив)
      */
     virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex=0) {
-        saveValue(value,param,arrayIndex);
+        SetParamChanged(param,arrayIndex, true);
+        if (!param->IsGroup(mwos_param_readonly)) // параметр не имеет флага readonly
+            saveValue(value,param,arrayIndex); // сохраним в хранилище
     }
 
     /***

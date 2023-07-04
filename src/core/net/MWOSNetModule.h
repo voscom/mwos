@@ -36,16 +36,16 @@
 class MWOSNetModule : public MWOSModule, public MWOSNetReciver {
 public:
 #pragma pack(push,1)
-    uint32_t cid;
+    uint32_t cid=MWOS_CONTROLLER_ID; // код контроллера, присвоенный сервером при первой авторизации. MWOS_CONTROLLER_ID - это предпочитаемый код (если он еще не занят на серврере)
     uint8_t connectedStep=0;
 #pragma pack(pop)
 
-    // описание параметров
+    // код контроллера
     MWOS_PARAM(0, controllerId, mwos_param_uint32, mwos_param_readonly, mwos_param_storage_eeprom, 1);
 
     MWOSNetModule(char * unit_name) : MWOSModule(unit_name) {
         AddParam(&p_controllerId);
-        cid=MWOS_CONTROLLER_ID;
+        moduleType=ModuleType::MODULE_NET;
     }
 
     virtual void onInit() {

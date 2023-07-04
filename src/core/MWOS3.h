@@ -37,6 +37,7 @@ public:
 
     MWOSStorage * storages[MWOS_PARAM_STORAGES_COUNT];
     uint8_t storageCount=0; // количество хранилищ
+    uint8_t storagesMask; // битовые маски чтения хранилищ. Если хранилище 0 успешно прочитано (с совпадением контрольной суммы), то бит 0 = 1. И так для первых 8 хранилищ!
 
     /**
      * общее количество модулей, включая модуль связи и модуль времени
@@ -54,6 +55,18 @@ public:
      * это могут быть данные в json-формате
      */
     char * info;
+
+    /***
+     * Модуль времени (если нет - NULL)
+     * можно задать явно. Если не задали - ищет первый модуль типа MODULE_TIME
+     */
+    MWOSModuleBase * timeModule;
+
+    /***
+     * Модуль связи (если нет - NULL)
+     * можно задать явно. Если не задали - ищет первый модуль типа MODULE_NET
+     */
+    MWOSModuleBase * netModule;
 
     MWOS3() : MWOSParent((char *) F("MWOS3")) {
         unitType=OS;
@@ -95,6 +108,7 @@ public:
             // сохраним
             if (!storages[storageType]->onInit(0,totalBitSize+16)) { // EEPROM новый
                 MW_LOG(F("Storage save: ")); MW_LOG_LN(storageType);
+                bitClear(storagesMask,storageType); // признак, что это хранилище ранее не было сохранено (настройки из базы данных серверера предпочтительнее)
                 int32_t bitOffset=0; // необходимо сохранить все значения по умолчанию
                 MWOSModuleBase * moduleNext=(MWOSModuleBase *) child;
                 while (moduleNext!=NULL && moduleNext->unitType==UnitType::MODULE) {
@@ -115,6 +129,7 @@ public:
                 }
                 storages[storageType]->commit();
             } else { // прочитаем все хранилища
+                bitSet(storagesMask,storageType); // признак, что это хранилище ранее было успешно сохранено (его настройки предпочтительнее настроек сервера)
                 MWOSModuleBase * moduleNext=(MWOSModuleBase *) child;
                 while (moduleNext!=NULL && moduleNext->unitType==UnitType::MODULE) {
                     MWOSParam * param=(MWOSParam *) moduleNext->child;
@@ -143,6 +158,8 @@ public:
             moduleNext->onInit();
             moduleNext=(MWOSModuleBase *) moduleNext->next;
         }
+        if (timeModule==NULL) timeModule=(MWOSModuleBase *) FindChildByModuleType(MODULE_TIME);
+        if (netModule==NULL) netModule=(MWOSModuleBase *) FindChildByModuleType(MODULE_NET);
         MW_LOG(F("MWOS3 initedSoft! Free mem: ")); MW_LOG_LN(getFreeMemory());
     }
 

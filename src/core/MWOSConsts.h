@@ -49,14 +49,14 @@ enum MWOSParamGroup : uint8_t {
     mwos_param_nogroup=0,
     // это параметр управления
     mwos_param_control=1,
-    // это датчик
+    // это показания датчика
     mwos_param_sensor=2,
     // это настройки
     mwos_param_option=4,
-    // это событие для записи в журнал
-    mwos_param_event=8,
     // только для чтения (нельзя отправлять команду записи этого параметра)
-    mwos_param_readonly=16
+    mwos_param_readonly=16,
+    // секретный параметр (который никогда не отправляется с контроллера)
+    mwos_param_secret=32
 };
 
 // типы юнита
@@ -64,6 +64,14 @@ enum UnitType : uint8_t {
     PARAM = 0,
     MODULE = 1,
     OS = 2
+};
+
+// типы модуля
+enum ModuleType : uint8_t {
+    MODULE_UNDEFINED = 0,
+    MODULE_NET = 1,
+    MODULE_TIME = 2,
+    MODULE_GATE = 3
 };
 
 // типы значений

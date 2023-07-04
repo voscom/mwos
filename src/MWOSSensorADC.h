@@ -43,7 +43,7 @@ public:
         return MWOSSensorAnalog<sensorsCount>::getValue(param, arrayIndex); // отправим значение из EEPROM
     }
 
-     virtual void initSensor(int16_t index, bool pullOn) {
+    virtual void initSensor(int16_t index, bool pullOn) {
          MWOSSensorAnalog<sensorsCount>::initSensor(index, pullOn);
         _pin[index]=MWOSSensorAnalog<sensorsCount>::loadValue(_pin[index], &p_pin, index);
         if (pullOn || !MWOSSensorAnalog<sensorsCount>::_pull_off) mwos.pin(_pin[index])->mode(false, MWOSSensorAnalog<sensorsCount>::_sensor_pull);

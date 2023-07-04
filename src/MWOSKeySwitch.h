@@ -1,16 +1,15 @@
 #ifndef MWOS3_MWOSKEYSWITCH_H
 #define MWOS3_MWOSKEYSWITCH_H
 /***
- * Переключатель с расширенной функциональностью (ключ, переключаемый датчиком)
- * Может сам выключасть и/или включаться через таймаут как keyex
+ * Переключатель (ключ, переключаемый датчиком)
  * Управляется заданным датчиком. При изменении бинарного значения датчика - переключает ключ.
  */
 
-#include "MWOSKeyExt.h"
+#include "MWOSKey.h"
 #include "core/MWOSSensorBase.h"
 
 template<uint16_t keysCount>
-class MWOSKeyExSwitch : public MWOSKeyExt<keysCount> {
+class MWOSKeySwitch : public MWOSKeyExt<keysCount> {
 public:
 #pragma pack(push,1)
     uint8_t _last_sensor_bin[keysCount];
@@ -20,27 +19,27 @@ public:
 
     // ************ описание параметров *****************
     // датчик для управления этим переключателем
-    MWOS_PARAM(8, sensor, mwos_param_uint16, mwos_param_option, mwos_param_storage_eeprom, keysCount);
+    MWOS_PARAM(10, sensor, mwos_param_uint16, mwos_param_option, mwos_param_storage_eeprom, keysCount);
 
     /***
      * Создать ключи
      * @param ports ссылка на область PROGMEM с номерами портов по умолчанию
      */
-    MWOSKeyExSwitch(const uint8_t * pins) : MWOSKeyExt<keysCount>(pins) {
+    MWOSKeySwitch(const uint8_t * pins) : MWOSKeyExt<keysCount>(pins) {
     }
 
     /***
      * Создать ключи.
      * Предполагается, что порты будут загружены среди всех прочих настроек
      */
-    MWOSKeyExSwitch() : MWOSKeyExt<keysCount>() {
+    MWOSKeySwitch() : MWOSKeyExt<keysCount>() {
     }
 
     /***
      * Создать ключи. Удобнее при создании одного ключа.
      * @param pin порт первого ключа
      */
-    MWOSKeyExSwitch(uint8_t pin) : MWOSKeyExt<keysCount>(pin) {
+    MWOSKeySwitch(uint8_t pin) : MWOSKeyExt<keysCount>(pin) {
     }
 
     virtual char * getName() {  return (char *) F("switch"); }
@@ -62,7 +61,7 @@ public:
             _sensor[index]=mwos.getModule(loadValue(UINT16_MAX, &p_sensor, index));
             if (_sensor[index]!=NULL) {
                 MWOSParam * sensorParam0=_sensor[index]->getParam(0);
-                if (sensorParam0==NULL || ((sensorParam0->paramGroup & mwos_param_sensor)==0)) _sensor[index]=NULL; // удалим не датчики
+                if (sensorParam0==NULL || !sensorParam0->IsGroup(mwos_param_sensor)) _sensor[index]=NULL; // удалим не датчики
             }
         }
     }

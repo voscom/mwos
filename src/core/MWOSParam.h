@@ -18,7 +18,7 @@
 #define MWOS_PARAM(_p_id, _p_name, _p_value_type, _p_param_group, _p_storage, _p_array_length) \
 class CLASS_MWOS_PARAM_##_p_name: public MWOSParam { \
     public: \
-    CLASS_MWOS_PARAM_##_p_name() : MWOSParam(_p_id, (char *) F(#_p_name), _p_value_type, _p_param_group, _p_storage, _p_array_length) { } \
+    CLASS_MWOS_PARAM_##_p_name() : MWOSParam(_p_id, (char *) F(#_p_name), _p_value_type, ((MWOSParamGroup) ( _p_param_group )), _p_storage, _p_array_length) { } \
 } p_##_p_name;
 //VALUE_##_p_value_type _##_p_name[_p_array_length]={ AddChild(&p_##_p_name) };
 
@@ -45,10 +45,6 @@ public:
         if (param_array_length<1) param_array_length=1;
     }
 
-    bool IsReadOnly() {
-        return (group & mwos_param_readonly) > 0;
-    }
-
     /**
      * Это хранилище заданного типа?
      * @param storageType
@@ -60,11 +56,12 @@ public:
     }
 
     /**
-     * Необходимо сохранять изменения в журнал
+     * Этот параметр относится к заданной группе?
+     * @param paramGroup
      * @return
      */
-    bool IsLogEvent() {
-        return (group & mwos_param_event) > 0;
+    bool IsGroup(MWOSParamGroup paramGroup) {
+        return (group & paramGroup)>0;
     }
 
     /**

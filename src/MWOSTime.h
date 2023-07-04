@@ -39,6 +39,7 @@ public:
     MWOS_PARAM(2, restarts, mwos_param_uint16, mwos_param_sensor, mwos_param_storage_rtc, 1);
 
     MWOSTime() : MWOSModule((char *) F("time")) {
+        moduleType=ModuleType::MODULE_TIME;
         AddParam(&p_time);
         AddParam(&p_uptime);
         AddParam(&p_restarts);
@@ -105,12 +106,17 @@ public:
     }
 
     /**
+     * Возвращает секунды с начала суток
+     */
+    uint32_t dailySec() {
+        return (getTime() % 86400UL); // так как время timestamp считается с полуночи, то это просто остаток от деления на количество секунд в сутках
+    }
+
+    /**
      * Возвращает минуты с начала суток
      */
     uint16_t dailyMin() {
-        time_t t = getTime();
-        struct tm *tm = localtime(&t);
-        return tm->tm_hour*60 + tm->tm_min;
+        return dailySec()/60;
     }
 
     /**

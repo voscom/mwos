@@ -104,6 +104,20 @@ public:
         return NULL;
     }
 
+    /***
+     * Найти дочерний элемент по типу модуля
+     * @param needModuleType
+     * @return
+     */
+    MWOSUnit * FindChildByModuleType(ModuleType needModuleType) {
+        MWOSUnit * unit=child;
+        while (unit!=NULL && unit->unitType==child->unitType) {  // ищем конец списка
+            if (unit->moduleType==needModuleType) return unit;
+            unit=unit->next;
+        }
+        return NULL;
+    }
+
 
 };
 

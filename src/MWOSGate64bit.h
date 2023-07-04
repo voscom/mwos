@@ -34,7 +34,7 @@ public:
      * Поддерживает только обращение к параметрам int32
      */
     MWOSGate64bit() : MWOSModule((char *) F("gate")) {
-
+        moduleType=ModuleType::MODULE_GATE;
     }
 
     /***

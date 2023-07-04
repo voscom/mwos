@@ -80,10 +80,9 @@ class MWOSDebug : public Stream {
         return size;
     }
 
-    uint16_t printModule(MWOSUnit * module) {
+    uint16_t printModule(MWOSUnit * module,uint16_t index=UINT16_MAX) {
     	uint16_t size=0;
     	uint32_t tm=millis();
-        uint16_t moduleNum=module->id;
     	size+=print(tm/60000);
     	size+=print(':');
     	size+=print((tm % 60000)/1000);
@@ -91,8 +90,12 @@ class MWOSDebug : public Stream {
     	size+=print(tm % 1000);
     	size+=print('>');
         size+=module->printName(this);
-        size+=print(':');
-        size+=print(moduleNum);
+        size+=print('.');
+        size+=print(module->id);
+        if (index!=UINT16_MAX) {
+            size+=print(':');
+            size+=print(index);
+        }
         size+=print('>');
     	//size+=printMem();
         size+=print(' ');
@@ -188,9 +191,6 @@ class MWOSDebug : public Stream {
 
 	uint16_t print_address(IPAddress ip, uint16_t port) { // вывести адрес в лог
         uint16_t size=0;
-#ifdef MWOS_NET_WIFI
-        size+=print(ip.toString());
-#else
 		size+=print(ip[0]);
 		size+=print('.');
 		size+=print(ip[1]);
@@ -198,7 +198,6 @@ class MWOSDebug : public Stream {
 		size+=print(ip[2]);
 		size+=print('.');
 		size+=print(ip[3]);
-#endif
         size+=print(':');
         size+=println(port);
         return size;

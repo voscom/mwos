@@ -30,15 +30,16 @@ class MWOSUnit {
 public:
 
 #pragma pack(push,1)
-
     uint16_t id=0; // индентификатор объекта
-    UnitType unitType=PARAM; // тип объекта
-    uint8_t errorCode=0; // код ошибки последней операции (если была ошибка). Пока не используется. Оставлено для выравнивания до 32бит
+    UnitType unitType; // тип объекта UnitType (PARAM,MODULE,OS)
+    uint8_t moduleType; // для модулей - тип модуля
     MWOSUnit * next=NULL; // следующий объект в списке (или родительский объект, для последнего в списке)
     char * name=NULL; // ссылка на имя или краткое описание в PROGMEM
 #pragma pack(pop)
 
     MWOSUnit(char * unit_name, uint16_t unit_id=0) {
+        unitType=PARAM;
+        moduleType=MODULE_UNDEFINED;
         id=unit_id;
         name=unit_name;
     }
