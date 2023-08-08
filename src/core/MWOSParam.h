@@ -33,15 +33,19 @@ public:
      * {mwos_param_array - признак массива} * {кол-во элементов массива} + {mwos_param_int16 - тип данных в массиве}
      * Или размер блока байтовых данных параметра 0..32k (задается просто положительным числом >0)
      */
-    int16_t valueType; // 16bit
+    MWOS_PARAM_INDEX_UINT arrayLength; // 8bit или 16bit
+    ParamValueType valueType; // 8bit или 16bit
     MWOSParamGroup group; // 8bit - к какой группе относится параметр
     MWOSParamStorage storage; // 8-bit - Тип хранилища
 #pragma pack(pop)
 
-    MWOSParam(int32_t param_id, char * param_name, ParamValueType value_type, MWOSParamGroup param_group, MWOSParamStorage param_storage, uint16_t param_array_length=0) : MWOSUnit(param_name,param_id) {
+    MWOSParam(int32_t param_id, char * param_name, ParamValueType value_type, MWOSParamGroup param_group, MWOSParamStorage param_storage, MWOS_PARAM_INDEX_UINT param_array_length=1) : MWOSUnit(param_name,param_id) {
         group=param_group;
         storage=param_storage;
-        valueType=value_type+(int16_t)mwos_param_array*param_array_length;
+        arrayLength=param_array_length;
+        if (arrayLength==0) arrayLength=1;
+        valueType=value_type;
+        if (arrayLength>1) valueType= (ParamValueType) (valueType | ParamValueType::mwos_param_array);
         if (param_array_length<1) param_array_length=1;
     }
 
@@ -91,18 +95,23 @@ public:
      */
     bool IsBytes() {
         if (valueType<0) return true;
-        return (valueType & 31) < mwos_param_bits1;
+        return GetParamValueType() < mwos_param_bits1;
     }
 
     /***
      * Возвращает количество однотипных данных в этом параметре
      * @return Если больше 1 - это массив
      */
-    uint16_t arrayCount() {
-        if (valueType<1) return 1;
-        int16_t arrayCount=valueType >> 5;
-        if (arrayCount<1) arrayCount=1;
-        return arrayCount;
+    MWOS_PARAM_INDEX_UINT arrayCount() {
+        return arrayLength;
+    }
+
+    /***
+     * Возвращает базовый тип параметра (без учета массива)
+     * @return
+     */
+    ParamValueType GetParamValueType() {
+        return (ParamValueType)(valueType & (ParamValueType::mwos_param_array - 1));
     }
 
      /**
@@ -110,10 +119,9 @@ public:
       * @param total   Суммарный обьем всех элементов массива (если данные параметра - массив), false - только одного элемента
       * @return
       */
-    int32_t bitsSize(bool total) {
-        if (valueType<0) return abs(valueType) << 3;
-        int32_t res=0;
-        switch (valueType & 31) {
+    uint32_t bitsSize(bool total) {
+        uint32_t res=0;
+        switch (GetParamValueType()) {
             case mwos_param_int8: res=8; break;
             case mwos_param_uint8: res=8; break;
             case mwos_param_int16: res=16; break;
@@ -131,6 +139,8 @@ public:
             case mwos_param_bits5: res=5; break;
             case mwos_param_bits6: res=6; break;
             case mwos_param_bits7: res=7; break;
+
+            default: res=0;
         }
         if (total) res *= arrayCount();
         return res;

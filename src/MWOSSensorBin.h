@@ -11,21 +11,21 @@
  */
 #include "core/MWOSSensorBase.h"
 
-template<uint16_t sensorsCount>
+template<MWOS_PARAM_INDEX_UINT sensorsCount>
 class MWOSSensorBin : public MWOSSensorBase<sensorsCount> {
 public:
-    uint8_t _pin[sensorsCount];
+    MWOS_PIN_INT _pin[sensorsCount];
 
     // описание параметров
-    MWOS_PARAM(1, pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, sensorsCount); // порты
+    MWOS_PARAM(1, pin, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, sensorsCount); // порты
 
     /***
      * Главный конструктор - создает с параметрами по умолчанию
      */
     MWOSSensorBin() : MWOSSensorBase<sensorsCount>() {
         MWOSModuleBase::AddParam(&p_pin);
-        for (uint16_t i = 0; i < sensorsCount; ++i) {
-            _pin[i]=255;
+        for (MWOS_PARAM_INDEX_UINT i = 0; i < sensorsCount; ++i) {
+            _pin[i]=-1;
         }
     }
 
@@ -34,7 +34,7 @@ public:
      * @param ports ссылка на область PROGMEM с номерами портов по умолчанию
      */
     MWOSSensorBin(const uint8_t * pins) : MWOSSensorBin<sensorsCount>() {
-        for (uint16_t i = 0; i < sensorsCount; ++i) {
+        for (MWOS_PARAM_INDEX_UINT i = 0; i < sensorsCount; ++i) {
             _pin[i]=pgm_read_byte_near(pins+i);
         }
     }
@@ -43,14 +43,15 @@ public:
      * Создать датчики (обычно используется для одиночных)
      * @param pin
      */
-    MWOSSensorBin(uint8_t pin) : MWOSSensorBin<sensorsCount>() {
+    MWOSSensorBin(MWOS_PIN_INT pin) : MWOSSensorBin<sensorsCount>() {
         _pin[0]=pin;
     }
 
     virtual void initSensor(int16_t index, bool pullOn) {
-        MW_LOG(F("MWOSSensorBin.def pin ")); MW_LOG_LN(_pin[index]);
+        MW_LOG_MODULE(this); MW_LOG(F("MWOSSensorBin.def pin ")); MW_LOG(index); MW_LOG('='); MW_LOG_LN(_pin[index]);
         MWOSSensorBase<sensorsCount>::initSensor(index, pullOn);
         _pin[index]=MWOSSensorBase<sensorsCount>::loadValue(_pin[index], &p_pin, index);
+        if (_pin[index]<0) return;
         if (pullOn || !MWOSSensorBase<sensorsCount>::_pull_off) mwos.pin(_pin[index])->mode(false, MWOSSensorBase<sensorsCount>::_sensor_pull);
         else mwos.pin(_pin[index])->mode(false, 0);
     }
@@ -61,6 +62,7 @@ public:
     }
 
     virtual bool readBoolValue(uint16_t arrayIndex) {
+        if (_pin[arrayIndex]<0) return 0;
         return mwos.pin(_pin[arrayIndex])->readDigital();
     }
 

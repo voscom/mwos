@@ -14,6 +14,9 @@
  *
  * При записи - длина блока не передается, а конец блока сообщается по фрейму sendEndBlock {03"MW"03}
  *
+ * Если задано MWOS_SEND_BUFFER_SIZE - отправляет через свой кольцевой буффер, если не задано - то напрямую в Stream соединения
+ * #define MWOS_SEND_BUFFER_SIZE
+ *
  */
 
 #include <core/adlib/MWTimeout.h>
@@ -50,7 +53,7 @@ public:
     bool IsConnected=false; // подключено к сереру
     MWOSModuleBase * sendModule=NULL;
     MWOSParam * sendParam=NULL;
-    uint16_t sendParamIndex=0;
+    MWOS_PARAM_INDEX_UINT sendParamIndex=0;
 #ifdef MWOS_SEND_BUFFER_USE
     uint8_t sendBuffer[MWOS_SEND_BUFFER_SIZE]; // кольцевой буффер отправляемых данных
     uint16_t writeOffset; // текущая позиция для записи в буффер
@@ -63,11 +66,15 @@ public:
     void sendUpdate() {
 #ifdef MWOS_SEND_BUFFER_USE
         if (writeOffset != sendOffset) { // отправим данные из буффера отправки
-            while (writeOffset != sendOffset && _stream->availableForWrite() > 0) {
-                if (_stream->write(sendBuffer[sendOffset])==0) {
+            while (writeOffset != sendOffset) {
+                int16_t sizeSend=writeOffset-sendOffset;
+                if (sizeSend<0) sizeSend=MWOS_SEND_BUFFER_SIZE-sendOffset;
+                if (_stream->write(&sendBuffer[sendOffset],sizeSend)==0) {
+                    MW_LOG(F("write block error: ")); MW_LOG_LN(sizeSend);
                     return; // никак не отправляется
                 }
-                sendOffset++; if (sendOffset>=MWOS_SEND_BUFFER_SIZE) sendOffset=0;
+                sendOffset+=sizeSend;
+                if (sendOffset>=MWOS_SEND_BUFFER_SIZE) sendOffset-=MWOS_SEND_BUFFER_SIZE;
             }
             return;
         }
@@ -87,7 +94,6 @@ public:
             //write(0);
             return 0;
         }
-        MW_LOG(F("writeHandshake: ")); MW_LOG(cid); MW_LOG(':'); MW_LOG_LN(this->availableForWrite());
         uint16_t size=sendBeginBlockParam(mwos_server_cmd_handshake); // 5
         size+=writeUInt32(cid); // 7 код контроллера
         size+=writeUInt64(MWOS_USER_HASH); // 15 отправим MW_User_Hash
@@ -100,6 +106,7 @@ public:
         size+=write(0); // 39 конец строки
         size+=write(mwos.storagesMask); // 41 состояния хранилищ
         size+=sendEndBlock();
+        MW_LOG(F("writeHandshake: ")); MW_LOG(cid); MW_LOG(':'); MW_LOG_LN(size);
         return size;
     }
 
@@ -139,7 +146,7 @@ public:
      */
     void writeFormatController() {
         if (sendModule==NULL && sendParam==NULL) {
-            int16_t controllerInfoSize= mwos.nameSize()+150;
+            int16_t controllerInfoSize= mwos.nameSize()+158;
             if (availableForWrite()<=controllerInfoSize) { // нет места для отправки начала блока и описания контроллера
                 return;
             }
@@ -158,6 +165,8 @@ public:
             write(0); // 98 конец строки
             write_progmem_str((char *) mwos_board,40); // 99 BOARD (до 40 байт)
             write(0); // 141 конец строки
+            uint64_t timeStampBuild=BUILD_TIME_PROJ;
+            write((uint8_t *) &timeStampBuild,8); // еще 8 байт - время компиляции
             sendModule=(MWOSModuleBase *) mwos.child;
             sendParamIndex=0;
         }
@@ -177,16 +186,17 @@ public:
             }
             // отправим данные параметров
             while (sendParam!=NULL) {
-                int16_t paramFormatSize=sendParam->nameSize()+9;
+                int16_t paramFormatSize=sendParam->nameSize()+10;
                 if (availableForWrite()<=paramFormatSize) { // нет места для отправки параметра
                     return;
                 }
                 writeUInt16(sendParam->id); // 2 id параметра (может и не соответствовать порядковому номеру)
-                writeInt16(sendParam->valueType); // 6 тип значения параметра
+                write(sendParam->valueType); // 6 тип значения параметра
+                writeUInt16(sendParam->arrayLength); // 7 размер массива параметра
                 write(sendParam->group); // 7 группа параметра
-                write((uint8_t) sendParam->storage); // 8 место хранения
+                write((uint8_t) sendParam->storage); // 9 место хранения
                 sendParam->printName(this); // имя
-                write(0); // 9 конец строки
+                write(0); // 10 конец строки
                 //MW_LOG(F("SendParamFormat: ")); MW_LOG(sendModule->id); MW_LOG(':'); MW_LOG_LN(sendParam->id);
                 sendParam=(MWOSParam *) sendParam->next;
                 if (sendParam!=NULL && sendParam->unitType!=UnitType::PARAM) sendParam=NULL;

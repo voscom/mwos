@@ -15,6 +15,7 @@
  *
  */
 
+#include "MWOSModuleBase.h"
 #include "MWOSParam.h"
 #include "MWOS3.h"
 

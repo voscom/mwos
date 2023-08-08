@@ -37,7 +37,7 @@ public:
      * Добавить к дочернему списку новый объект
      */
     bool AddChild(MWOSUnit * newUnit) {
-        if (newUnit==NULL || indexOfChildById(newUnit->id)>=0) { // обект не задан или уже есть с этим id
+        if (newUnit==NULL || (newUnit->id>0 && indexOfChildById(newUnit->id)>=0)) { // обект не задан или уже есть с этим id
             return false;
         }
         if (child==NULL) {

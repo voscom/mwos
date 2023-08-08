@@ -17,15 +17,33 @@ public:
         bits=new uint8_t[bitsCount/8+ (bitsCount % 8 != 0)];
     }
 
+    /***
+     * Заполнить весь массив одинаковым байтовым значением
+     * @param fillValue Байтовое значение (обычно 0 или 0xff)
+     */
+    void fill(uint8_t fillValue) {
+        for (uint16_t i = 0; i < (bitsCount/8+ (bitsCount % 8 != 0)); i++) {
+            bits[i]=fillValue;
+        }
+    }
+
     /**
      * Есть установленные биты
      * @return
      */
     bool haveSetBits() {
-        for (int32_t i = 0; i < (bitsCount/8+ (bitsCount % 8 != 0)); ++i) {
+        for (int32_t i = 0; i < (bitsCount/8+ (bitsCount % 8 != 0)); i++) {
             if (bits[i]>0) return true;
         }
         return false;
+    }
+
+    /***
+     * Возвращает количество бит в хранилище
+     * @return
+     */
+    size_t length() {
+        return bitsCount;
     }
 
     /***
@@ -33,9 +51,9 @@ public:
      * @return
      */
     int32_t firstSetBit() {
-        for (int32_t i = 0; i < (bitsCount/8+ (bitsCount % 8 != 0)); ++i) {
+        for (int32_t i = 0; i < (bitsCount/8+ (bitsCount % 8 != 0)); i++) {
             if (bits[i]>0) {
-                for (uint8_t j = 0; j < 8; ++j) {
+                for (uint8_t j = 0; j < 8; j++) {
                     if (bitRead(bits[i],j)) return (i << 3)+j;
                 }
             }

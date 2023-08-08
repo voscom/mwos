@@ -33,7 +33,11 @@ struct MWOSNetReciverFields {
      * @return
      */
     String GetString() {
-        return String(buffer,offset);
+        char lastCh=buffer[offset];
+        buffer[offset]=0;
+        String res=String((const char * ) buffer);
+        buffer[offset]=lastCh;
+        return res;
     }
 };
 #pragma pack(pop)

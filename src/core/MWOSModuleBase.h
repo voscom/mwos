@@ -46,7 +46,7 @@ class MWOSModuleBase : public MWOSParent {
 public:
 
 #pragma pack(push,1)
-    uint16_t paramsCount=0; // общее количество параметров модуля
+    MWOS_PARAM_UINT paramsCount=0; // общее количество параметров модуля
     MWBitsMask changedMask; // битовая маска для признаков изменения значений параметров (размер выделяется автоматом до onInit) // TODO: Надо перенести изменения параметров в модуль связи
 #pragma pack(pop)
 
@@ -81,7 +81,7 @@ public:
         while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
             if (paramNow->id==param_id) {
                 if (arrayIndex==UINT16_MAX) { // все параметры
-                    for (uint16_t i = 0; i < paramNow->arrayCount(); i++) {
+                    for (MWOS_PARAM_INDEX_UINT i = 0; i < paramNow->arrayCount(); i++) {
                         changedMask.setBit(changed,res+i);
                     }
                 } else
@@ -233,6 +233,7 @@ public:
             case mwos_server_cmd_param_get_param: // запросили данные всего параметра
                 SetParamChangedByParamId(reciverDat->param_id, UINT16_MAX, true); // отправить все значения
                 return true;
+            default: return false;
         }
         return false;
     }

@@ -20,11 +20,11 @@
 #define minValue	-30*16
 #define maxValue	80*16
 
-template<uint16_t sensorsCount>
+template<MWOS_PARAM_INDEX_UINT sensorsCount>
 class MWOSSensorDS : public MWOSSensorAnalog<sensorsCount> {
 public:
-    uint8_t _pin;
-    uint8_t _pinPower;
+    MWOS_PIN_INT _pin;
+    MWOS_PIN_INT _pinPower;
     int8_t _errorCode=0;
     int8_t initedStep; // текущий датчик DS
     OneWire * ds=NULL;
@@ -33,9 +33,9 @@ public:
 
     //************************ описание параметров ***********************/
     // порт для датчиков DS
-    MWOS_PARAM(1, pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(1, pin, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, 1);
     // порт включения питания для датчиков DS
-    MWOS_PARAM(18, power, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(18, power, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, 1);
     // адреса DS для каждого обнаруженного датчика
     MWOS_PARAM(19, address, mwos_param_int64, mwos_param_readonly, mwos_param_storage_eeprom, sensorsCount);
 
@@ -53,7 +53,7 @@ public:
      * Создать датчики
      * @param port порт датчиков DS
      */
-    MWOSSensorDS(uint8_t pin) : MWOSSensorDS<sensorsCount>() {
+    MWOSSensorDS(MWOS_PIN_INT pin) : MWOSSensorDS<sensorsCount>() {
         _pin=pin;
     }
 
@@ -63,6 +63,7 @@ public:
         MWOSSensorAnalog<sensorsCount>::onInit();
         _pin=MWOSSensorAnalog<sensorsCount>::loadValue(_pin, &p_pin, 0);
         _pinPower=MWOSSensorAnalog<sensorsCount>::loadValue(_pinPower, &p_power, 0);
+        if (_pin<0) return;
         mwos.pin(_pin)->mode(false, MWOSSensorAnalog<sensorsCount>::_sensor_pull);
         if (ds==NULL) ds=new OneWire(_pin);
         else ds->begin(_pin);
@@ -96,7 +97,7 @@ public:
      *
      */
     virtual int32_t readAnalogValue(int16_t arrayIndex) {
-        if (!isSetAddress(arrayIndex)) return 0;
+        if (!isSetAddress(arrayIndex) || _pin<0) return 0;
         bool measuring=MWOSSensorAnalog<sensorsCount>::_value_bin[arrayIndex].bit_req; // третий бит значения - был запрос на измерение температуры
         if (measuring) { // ранее было задано измерение температуры
             MWOSSensorAnalog<sensorsCount>::_value_bin[arrayIndex].bit_req=0; // сбросим измерение
@@ -113,6 +114,7 @@ public:
      * Если места в настройках не хватает - генерирует ошибку 3
      */
     void updateAllDS() {
+        if (_pin<0) return;
         int64_t addr64=0;
         uint8_t * addr=(uint8_t *)addr64;
         while (ds->search(addr))  { // нашли очередное DS-устройство
@@ -137,14 +139,14 @@ public:
      * @return  индекс адреса (-1, если не найдено)
      */
     int16_t indexOfAddress(int64_t addr64) {
-        for (int16_t i = 0; i < sensorsCount; ++i) {
+        for (uint16_t i = 0; i < sensorsCount; ++i) {
             if (_address[i]==addr64) return i;
         }
         return -1;
     }
 
     bool isSetAddress(int16_t numDS) {
-        return numDS<sensorsCount && _address[numDS]>0;
+        return numDS<(int16_t) sensorsCount && _address[numDS]>0;
     }
 
     /**

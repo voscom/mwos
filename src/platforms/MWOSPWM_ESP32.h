@@ -26,9 +26,11 @@ public:
 
     MWOSPWM_ESP32() : MWOSRegulator() {
         setName((char *) F("hz"));
+        AddParam(&p_channel);
+        AddParam(&p_resolution);
     }
 
-    MWOSPWM_ESP32(uint8_t pin, int64_t fr=0, int64_t pulse=50, int8_t channel=-1) : MWOSPWM_ESP32() {
+    MWOSPWM_ESP32(MWOS_PIN_INT pin, int64_t fr=0, int64_t pulse=50, int8_t channel=-1) : MWOSPWM_ESP32() {
         _pin=pin;
         _value=fr; // частота
         _value2=pulse; // по умолчанию скваженность 50%

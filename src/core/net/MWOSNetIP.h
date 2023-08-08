@@ -1,9 +1,7 @@
 #ifndef MWOS3_MWOSNETIP_H
 #define MWOS3_MWOSNETIP_H
 
-#ifndef MWOS_SEND_BUFFER_SIZE
-#define MWOS_SEND_BUFFER_SIZE 2048 // размер буффера отправки для сетевого устройства
-#endif
+#include "Client.h"
 
 const char server_url1[] PROGMEM = "voscom.online";
 const char server_url2[] PROGMEM = "voscom.ru";
@@ -52,6 +50,8 @@ public:
 
     MWOSNetIP() : MWOSNetDevice() {
         AddParam(&p_reconnectCount);
+        AddParam(&p_ip4);
+        AddParam(&p_ipPort);
     }
 
     virtual void onInit() {
@@ -70,14 +70,8 @@ public:
     }
 
     virtual void connectToServer() { // начать подключение к серверу
-        if (!_stream) {
-            MWAsyncClient * client=new MWAsyncClient(MWOS_SEND_BUFFER_SIZE);
-            _stream=client;
-            client->setTimeout(6000); // таймаут 5 сек, чтобы успеть сбросить вачдог в 8 сек
-            MW_LOG_MODULE(this);  MW_LOG(F("MWOSController set stream: ")); MW_LOG_LN((uint16_t) MWOS_SEND_BUFFER_SIZE);
-        }
         reconnectStep++;
-        if (reconnectStep>reconnectCount+2) reconnectStep=0;
+        if (reconnectStep>reconnectCount+3) reconnectStep=0;
         if (reconnectStep<reconnectCount) {
             if (ipPort==0 || ipPort==0xffffffff) {
                 connectAsync(IPAddress(ip4)); // подключимся к сокет-серверу из параметра
@@ -85,6 +79,7 @@ public:
                 connectAsync(MWOS_SERVER_HOST); // подключимся к сокет-серверу по умолчанию
             }
         } else {
+            /*
             if (reconnectStep==reconnectCount) {
                 char server_url[strlen_P(server_url1) + 1];
                 strcpy_P(server_url, server_url1);
@@ -99,33 +94,36 @@ public:
                 char server_url[strlen_P(server_url3) + 1];
                 strcpy_P(server_url, server_url3);
                 connectAsync(server_url); // подключимся к сокет-серверу
-            }
+            } */
         }
         connect_timeout.start(50); // следующая попытка только через 5 сек
         MWOSNetDevice::connectToServer();
     }
 
     void connectAsync(const char *server_url){
-        ((MWAsyncClient *) _stream)->connect(server_url,ipPort); // подключимся к сокет-серверу
-        MW_LOG_MODULE(this); MW_LOG(F("Connect to server url ")); MW_LOG(reconnectStep); MW_LOG('>'); MW_LOG(server_url); MW_LOG(':'); MW_LOG_LN(ipPort);
+        MW_LOG_MODULE(this); MW_LOG(F("Connect to server url step: "));
+        ((Client *) _stream)->connect(server_url,ipPort); // подключимся к сокет-серверу
+        MW_LOG(reconnectStep); MW_LOG('>'); MW_LOG(server_url); MW_LOG(':'); MW_LOG_LN(ipPort);
     }
 
     void connectAsync(IPAddress ip){
-        ((MWAsyncClient *) _stream)->connect(ip,ipPort); // подключимся к сокет-серверу
-        MW_LOG_MODULE(this); MW_LOG(F("Connect to server ip ")); MW_LOG(reconnectStep); MW_LOG('>'); MW_LOG(ip); MW_LOG(':'); MW_LOG_LN(ipPort);
+        MW_LOG_MODULE(this); MW_LOG(F("Connect to server ip step: "));
+        ((Client *) _stream)->connect(ip,ipPort); // подключимся к сокет-серверу
+        MW_LOG(reconnectStep); MW_LOG('>'); MW_LOG(ip); MW_LOG(':'); MW_LOG_LN(ipPort);
     }
 
-    virtual bool isConnectedServer() { // есть подключение к серверу?
-        return ((MWAsyncClient *) _stream)->connected();
+    virtual bool isConnectedServer(bool firstTime) { // есть подключение к серверу?
+        return ((Client *) _stream)->connected();
     }
 
-    void disconnect() {
+    virtual void onDisconnect() {
         if (_stream!=NULL) {
-            if (((MWAsyncClient *) _stream)->connected()) ((MWAsyncClient *) _stream)->stop(); // разорвем соединение, чтобы начать его заново
+            if (((Client *) _stream)->connected()) ((Client *) _stream)->stop(); // разорвем соединение, чтобы начать его заново
             //delete _stream;
-            //_stream=NULL;
-            MW_LOG_MODULE(this); MW_LOG(F("disconnect step:"));  MW_LOG_LN(reconnectStep);
+            _stream=NULL;
+            MW_LOG_MODULE(this); MW_LOG(F("disconnect step:"));  MW_LOG(reconnectStep); MW_LOG(F(", mem:")); MW_LOG_LN(getFreeMemory());
         }
+        MWOSNetDevice::onDisconnect();
     }
 
 };

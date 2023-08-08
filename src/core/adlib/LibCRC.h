@@ -12,7 +12,7 @@
 #define MWLIB_CRC_H_
 
 #include <Arduino.h>
-#include "MWEEPROM.h"
+#include "core/iodev/MWEEPROM.h"
 
 class MW_CRC16 {
 public:
@@ -61,7 +61,7 @@ public:
 	uint16_t calcEEPROM(uint16_t size, uint16_t offset=0) {
 		start();
 		for (uint16_t i=0; i<size; i++) {
-			add(MWEEPROM.read(offset+i));
+			add(MWEEPROM.readByte(offset+i));
 		}
 		return crc;
 	}

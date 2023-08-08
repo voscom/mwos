@@ -27,7 +27,11 @@
 #endif
 
 #ifndef MWOS_NET_BEFORE_CONNECT_TIMEOUT
-#define MWOS_NET_BEFORE_CONNECT_TIMEOUT 50 // [сек/10] время ожидания после включения сети перед проверкой подключения к сети (шаг 4)
+#define MWOS_NET_BEFORE_CONNECT_TIMEOUT 30 // [сек/10] время ожидания после включения сети перед проверкой подключения к сети (шаг 4)
+#endif
+
+#ifndef MWOS_SERVER_BEFORE_CONNECT_TIMEOUT
+#define MWOS_SERVER_BEFORE_CONNECT_TIMEOUT 10 // [сек/10] время ожидания после попытки подключения к серверу, перед проверкой подключения к серверу (шаг 6)
 #endif
 
 #ifndef MWOS_NET_CONNECTNET_TIMEOUT
@@ -65,77 +69,82 @@ public:
     }
 
     virtual void connectedStepRun() {
-        if (connectedStep!=15) {
+        if (connectedStep!=STEP_SERVER_CONNECTED) {
             if (IsConnected)  {
                 onDisconnect();
             }
         }
         switch (connectedStep) {
-            case 0: // отключим подключение к сети
+            case STEP_NET_CLOSE: // отключим подключение к сети
                 IsConnected= false;
                 connect_timeout.start(MWOS_NET_RESTART_TIMEOUT);
                 closeNet();
-                setConnectedStep(1);
+                setConnectedStep(STEP_NET_CLOSING);
                 return;
-            case 1: // ждем отключения сети
+            case STEP_NET_CLOSING: // ждем отключения сети
                 if (!connect_timeout.isTimeout()) return;
-                setConnectedStep(2);
-            case 2: // аппаратно включим сеть
+                setConnectedStep(STEP_NET_START);
+            case STEP_NET_START: // аппаратно включим сеть
                 connect_timeout.start(MWOS_NET_STARTNET_TIMEOUT);
-                setConnectedStep(3);
+                setConnectedStep(STEP_NET_STARTING);
                 startNet();
                 return;
-            case 3: // ждем аппаратного включения сети
+            case STEP_NET_STARTING: // ждем аппаратного включения сети
                 if (!connect_timeout.isTimeout()) return;
-                setConnectedStep(4);
-            case 4: // подключение и инициализация сети
+                setConnectedStep(STEP_NET_CONNECT);
+            case STEP_NET_CONNECT: // подключение и инициализация сети
                 lastReciveTimeout.start(MWOS_NET_BEFORE_CONNECT_TIMEOUT);
                 connect_timeout.start(MWOS_NET_CONNECTNET_TIMEOUT);
-                setConnectedStep(5);
+                setConnectedStep(STEP_NET_CONNECTING);
                 connectNet();
                 return;
-            case 5: // ждем подключения сети
+            case STEP_NET_CONNECTING: // ждем подключения сети
                 if (!lastReciveTimeout.isTimeout()) return; // ждем таймаута по любому
                 if (isConnectedNet()) {
-                    setConnectedStep(6);
+                    setConnectedStep(STEP_SERVER_CONNECT);
                 } else if (connect_timeout.isTimeout()) {
-                    onDisconnect(); // отвалиться через 20 сек, если не подключились
+                    MW_LOG_MODULE(this); MW_LOG_LN(F("Net Error!"));
+                    setConnectedStep(STEP_NET_CLOSE);
+                    if (IsConnected) setStatusForGates(false);
+                    IsConnected=false;
                 }
                 return;
-            case 6: // подключимся к серверу
+            case STEP_SERVER_CONNECT: // подключимся к серверу
                 connect_timeout.start(MWOS_NET_CONNECT_SERVER_TIMEOUT); // переподключать только через 20 сек
-                setConnectedStep(7);
+                lastReciveTimeout.start(MWOS_SERVER_BEFORE_CONNECT_TIMEOUT);
+                setConnectedStep(STEP_SERVER_CONNECTING);
                 connectToServer();
                 return;
-            case 7: // ждем подключения к серверу
-                if (isConnectedServer()) {
-                    setConnectedStep(8);
+            case STEP_SERVER_CONNECTING: // ждем подключения к серверу
+                if (!lastReciveTimeout.isTimeout()) return; // ждем таймаута по любому (сразу не проверяем статус подключения к серверу)
+                if (isConnectedServer(true)) {
+                    setConnectedStep(STEP_SERVER_HANDSHAKE);
                     connect_timeout.start(MWOS_NET_HANDSHAKE_TIMEOUT); // ждем Handshake 10сек
                 }
                 else if (connect_timeout.isTimeout()) onDisconnect(); // отвалиться через 20 сек, если не подключились
                 return;
-            case 8: // отправляем хендшейк
+            case STEP_SERVER_HANDSHAKE: // отправляем хендшейк
                 if (writeHandshake(cid)>0) {
-                    setConnectedStep(9);
+                    setConnectedStep(STEP_SERVER_WAIT_ID);
                     connect_timeout.start(MWOS_NET_CONTROLLER_ID_TIMEOUT); // отвалиться через несколько сек, если не пришел код контроллера
                     lastReciveTimeout.stop(); // остановим таймаут приемки данных (его стартует при получении пакета от сервера)
                 }
                 else if (connect_timeout.isTimeout()) onDisconnect();// отвалиться через 10 сек, если не прошел Handshake
                 return;
-            case 9: // дождемся кода контроллера
+            case STEP_SERVER_WAIT_ID: // дождемся кода контроллера
                 if ((_stream!=NULL) && (cid>0) && lastReciveTimeout.isStarted()) {
-                    setConnectedStep(15);
+                    setConnectedStep(STEP_SERVER_CONNECTED);
                 }
                 else if (connect_timeout.isTimeout()) onDisconnect();// отвалиться через 20 сек, если не пришел код контроллера
                 return;
-            case 15:
+            case STEP_SERVER_CONNECTED:
                 if (!IsConnected) {
                     onConnect();
                 } else {
                     if (lastReciveTimeout.isTimeout()) { // провышено время от последнего переданного байта
                         onReciveTimeout();
                     }
-                    if (!isConnectedServer()) {
+                    if (!isConnectedServer(false)) {
                         MW_LOG_MODULE(this);  MW_LOG_LN(F("Server dont connect!"));
                         onDisconnect();
                         return;
@@ -147,8 +156,8 @@ public:
     virtual void connectToServer() { // начать подключение к серверу
     }
 
-    virtual bool isConnectedServer() { // есть подключение к серверу?
-        return true;
+    virtual bool isConnectedServer(bool firstTime) { // есть подключение к серверу?
+        return false;
     }
 
     virtual void connectNet() { // начать подключение к сети

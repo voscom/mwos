@@ -8,7 +8,7 @@ extern MWOS3 mwos;
  * Может включаться ежедневно в заданное время (минут с полуночи). В эту минуту суток принудительно включает ключ, если он выключен
  * Если эта возможность не нужна - рекомендуется использовать MWOSKey
  */
-template<uint16_t keysCount>
+template<MWOS_PARAM_INDEX_UINT keysCount>
 class MWOSKeyExt : public MWOSKey<keysCount> {
 public:
 #pragma pack(push,1)
@@ -33,7 +33,7 @@ public:
      * @param ports ссылка на область PROGMEM с номерами портов по умолчанию
      */
     MWOSKeyExt(const uint8_t * pins) : MWOSKey<keysCount>(pins) {
-        afterCreate();
+        initKeyExt();
     }
 
     /***
@@ -41,20 +41,21 @@ public:
      * Предполагается, что порты будут загружены среди всех прочих настроек
      */
     MWOSKeyExt() : MWOSKey<keysCount>() {
+        initKeyExt();
     }
 
     /***
      * Создать ключи. Удобнее при создании одного ключа.
      * @param pin порт первого ключа
      */
-    MWOSKeyExt(uint8_t pin) : MWOSKey<keysCount>(pin) {
-        afterCreate();
+    MWOSKeyExt(MWOS_PIN_INT pin) : MWOSKey<keysCount>(pin) {
+        initKeyExt();
     }
 
-    void afterCreate() {
+    void initKeyExt() {
         MWOSKey<keysCount>::AddParam(&p_timeon);
         MWOSKey<keysCount>::AddParam(&p_timeoff);
-        for (uint16_t index = 0; index < keysCount; ++index) {
+        for (MWOS_PARAM_INDEX_UINT index = 0; index < keysCount; ++index) {
             _timeon[index]=0;
             _timeoff[index]=0;
             _scheduleOn[index]=0;
@@ -63,7 +64,7 @@ public:
 
     virtual void onInit() {
         MW_LOG_LN(F("MWOSKeyExt.onInit"));
-        for (uint16_t index = 0; index < keysCount; ++index) {
+        for (MWOS_PARAM_INDEX_UINT index = 0; index < keysCount; ++index) {
             _timeon[index]=MWOSModule::loadValue(_timeon[index], &p_timeon, index);
             _timeoff[index]=MWOSModule::loadValue(_timeoff[index], &p_timeoff, index);
             _scheduleOn[index]=MWOSModule::loadValue(_scheduleOn[index], &p_scheduleOn, index);

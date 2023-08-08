@@ -7,20 +7,20 @@
  */
 #include "core/MWOSSensorAnalog.h"
 
-template<uint16_t sensorsCount>
+template<MWOS_PARAM_INDEX_UINT sensorsCount>
 class MWOSSensorADC : public MWOSSensorAnalog<sensorsCount> {
 public:
-    uint8_t _pin[sensorsCount];
+    MWOS_PIN_INT _pin[sensorsCount];
 
     //************************ описание параметров ***********************/
     // порты
-    MWOS_PARAM(1, pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, sensorsCount);
+    MWOS_PARAM(1, pin, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, sensorsCount);
 
     MWOSSensorADC() : MWOSSensorAnalog<sensorsCount>() {
         MWOSModuleBase::setName((char *) F("adc"));
         MWOSModuleBase::AddParam(&p_pin);
-        for (uint16_t i = 0; i < sensorsCount; ++i) {
-            _pin[i]=255;
+        for (MWOS_PARAM_INDEX_UINT i = 0; i < sensorsCount; ++i) {
+            _pin[i]=-1;
         }
     }
 
@@ -29,12 +29,12 @@ public:
      * @param ports ссылка на область PROGMEM с номерами портов по умолчанию
      */
     MWOSSensorADC(const uint8_t * pins) : MWOSSensorADC<sensorsCount>() {
-        for (uint16_t i = 0; i < sensorsCount; ++i) {
+        for (MWOS_PARAM_INDEX_UINT i = 0; i < sensorsCount; ++i) {
             _pin[i]=pgm_read_byte_near(pins+i);
         }
     }
 
-    MWOSSensorADC(uint8_t pin) : MWOSSensorADC<sensorsCount>() {
+    MWOSSensorADC(MWOS_PIN_INT pin) : MWOSSensorADC<sensorsCount>() {
         _pin[0]=pin;
     }
 
@@ -46,6 +46,7 @@ public:
     virtual void initSensor(int16_t index, bool pullOn) {
          MWOSSensorAnalog<sensorsCount>::initSensor(index, pullOn);
         _pin[index]=MWOSSensorAnalog<sensorsCount>::loadValue(_pin[index], &p_pin, index);
+        if (_pin[index]<0) return;
         if (pullOn || !MWOSSensorAnalog<sensorsCount>::_pull_off) mwos.pin(_pin[index])->mode(false, MWOSSensorAnalog<sensorsCount>::_sensor_pull);
         else mwos.pin(_pin[index])->mode(false, 0);
     }
@@ -54,10 +55,12 @@ public:
      * Опросить аналоговый датчик для получения новых показаний
      */
     virtual int32_t readAnalogValue(int16_t arrayIndex) {
+        if (_pin[arrayIndex]<0) return 0;
         return mwos.pin(_pin[arrayIndex])->readAnalog();
     }
 
     virtual int32_t readDigitalValue(int16_t arrayIndex) {
+        if (_pin[arrayIndex]<0) return 0;
         return mwos.pin(_pin[arrayIndex])->readDigital();
     }
 

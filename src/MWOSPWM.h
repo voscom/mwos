@@ -16,7 +16,7 @@
 #include <Arduino.h>
 #include "core/MWOSRegulator.h"
 #ifdef STM32_MCU_SERIES
-#include "platforms/MWOSHz_STM32.h"
+#include "platforms/MWOSPWM_STM32.h"
 #define MWOSHz MWOSHz_STM32
 #endif
 #ifdef ESP32

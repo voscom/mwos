@@ -35,9 +35,8 @@ public:
     virtual void commit() {}
     virtual void write(size_t byteOffset, uint8_t v) {}
 
-    virtual bool onInit(size_t offset, size_t bitSize) {
+    virtual bool onInit(size_t bitSize) {
         _bitSize=bitSize;
-        _offset=offset;
         // посчитаем контрольную сумму версии прошивки
         MW_CRC16 crc16;
         crc16.start();
@@ -64,16 +63,16 @@ public:
     void setBit(uint8_t bitV, size_t bitOffset) {
         size_t byteOffset=(bitOffset >> 3)+_offset+CheckSumSize;
         uint8_t bitOffsetInByte=bitOffset & 7;
-        uint8_t byteV=read(byteOffset);
+        uint8_t byteV=read(byteOffset+CheckSumSize);
         bitClear(byteV,bitOffsetInByte);
         if (bitV>0) bitSet(byteV,bitOffsetInByte);
-        write(byteOffset,byteV);
+        write(byteOffset+CheckSumSize,byteV);
     }
 
     uint8_t getBit(size_t bitOffset) {
         size_t byteOffset=(bitOffset >> 3)+_offset+CheckSumSize;
         uint8_t bitOffsetInByte=bitOffset & 7;
-        return bitRead(read(byteOffset),bitOffsetInByte);
+        return bitRead(read(byteOffset+CheckSumSize),bitOffsetInByte);
     }
 
     /***
@@ -95,7 +94,7 @@ public:
             size_t byteSize=bitSize >> 3;
             uint8_t * dataArray=(uint8_t *) &value;
             for (uint8_t i = 0; i < byteSize; ++i) {
-                write(byteOffset+i,dataArray[i]);
+                write(byteOffset+i+CheckSumSize,dataArray[i]);
             }
         } else { // скопируем побитно
             for (uint8_t i = 0; i < bitSize; ++i) {
@@ -114,7 +113,7 @@ public:
      */
     int64_t loadValue(size_t bitOffset, int8_t bitSize) {
         if (bitOffset+bitSize>_bitSize) {
-            error(1);
+            error(2);
             return 0;
         }
         int64_t value=0;
@@ -125,7 +124,7 @@ public:
             uint8_t byteSize = bitSize >> 3;
             uint8_t *dataArray = (uint8_t *) &value;
             for (uint8_t i = 0; i < byteSize; ++i) {
-                dataArray[i]=read(byteOffset + i);
+                dataArray[i]=read(byteOffset + i+CheckSumSize);
             }
         } else {
             for (int8_t i = bitSize-1; i >= 0; i--) {

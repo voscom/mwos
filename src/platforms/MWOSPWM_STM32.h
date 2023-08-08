@@ -23,7 +23,7 @@ public:
         setName((char *) F("hz"));
     }
 
-    MWOSPWM_STM32(uint8_t pin, int64_t fr=0, int64_t pulse=50) : MWOSHz() {
+    MWOSPWM_STM32(MWOS_PIN_INT pin, int64_t fr=0, int64_t pulse=50) : MWOSRegulator() {
         _pin=pin;
         _value=fr; // частота
         _value2=pulse; // по умолчанию скваженность 50%
@@ -33,7 +33,7 @@ public:
 
     virtual void onInit() {
         MWOSRegulator::onInit();
-        if (_pin<255) {
+        if (_pin>=0) {
             pinMode(_pin, OUTPUT);
 
             TIM_TypeDef *Instance = (TIM_TypeDef *)pinmap_peripheral(digitalPinToPinName(_pin), PinMap_PWM);

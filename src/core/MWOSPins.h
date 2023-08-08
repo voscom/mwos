@@ -10,12 +10,12 @@ public:
     /**
      * Первый порт на этом блоке (от него начинается нумерация портов на блоке)
      */
-    uint16_t firstPin;
+    MWOS_PIN_INT firstPin;
     MWOSPins * next=NULL; // Следующий модуль расширитель портов
 
-    MWOSPins() {
-        firstPin=0;
-        pinReset=255;
+    MWOSPins(MWOS_PIN_INT _firstPin=0) {
+        firstPin=_firstPin;
+        pinReset=-1;
     }
 
     /***
@@ -26,7 +26,7 @@ public:
     MWOSPins *  add(MWOSPins * newPorts) {
         if (next==NULL) {
             next=newPorts;
-            newPorts->firstPin=firstPin+getCount();
+            if (newPorts->firstPin<firstPin+getCount()) newPorts->firstPin=firstPin+getCount();
             MW_LOG(F("newPorts: ")); MW_LOG(newPorts->firstPin); MW_LOG('+'); MW_LOG_LN(newPorts->getCount());
             return newPorts;
         }
@@ -45,9 +45,9 @@ public:
      * @param resetPin Порт ножки микроконтроллера, куда подключен RESET этого блока расширителя портов (по умолчанию - не задан)
      * @return
      */
-    void setResetPin(uint8_t resetPin=255) {
+    void setResetPin(MWOS_PIN_INT resetPin=-1) {
         pinReset=resetPin;
-        if (pinReset<255) {
+        if (pinReset>=0) {
             pinMode(pinReset,OUTPUT);
             digitalWrite(pinReset,HIGH);
         }
@@ -58,14 +58,14 @@ public:
      * @return
      */
     void reset() {
-        if (pinReset<255) {
+        if (pinReset>=0) {
             digitalWrite(pinReset,LOW);
             delay(100);
             digitalWrite(pinReset,HIGH);
         }
     }
 
-    bool isPin(uint16_t pinNum) {
+    bool isPin(MWOS_PIN_INT pinNum) {
         pin=pinNum;
         return ((firstPin<=pin) && (firstPin+getCount()>pin));
     }
@@ -73,7 +73,6 @@ public:
     /**
      * Задать режим на вход или на выход
      * и подтяжку, если нужно
-     * @param	pin	код порта
      * @param	outPort	настройить порт на выход (false - на вход)
      * @param   pull тип подтяжки порта (0-нет, 1-на 0, 2-на питание, 3 - открытый коллектор)
      */
@@ -129,8 +128,8 @@ public:
     }
 
 protected:
-    uint8_t pinReset=255; // Порт, к которому подключена ножка RESET этого расширителя портов
-    uint16_t pin; // Текущий порт, с которым идет работа
+    MWOS_PIN_INT pinReset=-1; // Порт, к которому подключена ножка RESET этого расширителя портов
+    MWOS_PIN_INT pin; // Текущий порт, с которым идет работа
 };
 
 

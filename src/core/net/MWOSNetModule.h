@@ -33,11 +33,28 @@
 #define MWOS_CONTROLLER_ID 0	// id контроллера по умолчанию
 #endif
 
+/**
+ * Шаги подключения к серверу MWOS
+ */
+enum MWOSNetStep : int8_t {
+    STEP_NET_CLOSE = 0,
+    STEP_NET_CLOSING = 1,
+    STEP_NET_START = 2,
+    STEP_NET_STARTING = 3,
+    STEP_NET_CONNECT = 4,
+    STEP_NET_CONNECTING = 5,
+    STEP_SERVER_CONNECT = 6,
+    STEP_SERVER_CONNECTING = 7,
+    STEP_SERVER_HANDSHAKE = 8,
+    STEP_SERVER_WAIT_ID = 9,
+    STEP_SERVER_CONNECTED = 15,
+};
+
 class MWOSNetModule : public MWOSModule, public MWOSNetReciver {
 public:
 #pragma pack(push,1)
     uint32_t cid=MWOS_CONTROLLER_ID; // код контроллера, присвоенный сервером при первой авторизации. MWOS_CONTROLLER_ID - это предпочитаемый код (если он еще не занят на серврере)
-    uint8_t connectedStep=0;
+    MWOSNetStep connectedStep=STEP_NET_CLOSE;
 #pragma pack(pop)
 
     // код контроллера
@@ -86,19 +103,23 @@ public:
 
     virtual void onConnect() {
         MW_LOG_MODULE(this); MW_LOG_LN(F("onConnect!"));
-        setConnectedStep(15);
+        setConnectedStep(STEP_SERVER_CONNECTED);
         if (!IsConnected) setStatusForGates(true);
         IsConnected=true;
     }
 
     virtual void onDisconnect() {
         MW_LOG_MODULE(this); MW_LOG_LN(F("onDisconnect!"));
-        setConnectedStep(0);
+#ifdef MWOS_SEND_BUFFER_USE
+        sendOffset=0; // сбросим буффер отправки
+        writeOffset=0;  // сбросим буффер отправки
+#endif
+        setConnectedStep(STEP_NET_CONNECTING); // перейдем на шаг подключения к серверу
         if (IsConnected) setStatusForGates(false);
         IsConnected=false;
     }
 
-    void setConnectedStep(uint8_t newStep) {
+    void setConnectedStep(MWOSNetStep newStep) {
         connectedStep=newStep;
         MW_LOG_MODULE(this); MW_LOG(F("net step: ")); MW_LOG_LN(connectedStep);
     }

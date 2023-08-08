@@ -17,10 +17,28 @@ public:
      * @return
      */
     bool haveSetBits() {
-        for (uint16_t i = 0; i < sizeof(bits); ++i) {
+        for (uint16_t i = 0; i < sizeof(bits); i++) {
             if (bits[i]>0) return true;
         }
         return false;
+    }
+
+    /***
+     * Заполнить весь массив одинаковым байтовым значением
+     * @param fillValue Байтовое значение (обычно 0 или 0xff)
+     */
+    void fill(uint8_t fillValue) {
+        for (uint16_t i = 0; i < sizeof(bits); i++) {
+            bits[i]=fillValue;
+        }
+    }
+
+    /***
+     * Возвращает количество бит в хранилище
+     * @return
+     */
+    size_t length() {
+        return bitsCount;
     }
 
     /**
@@ -34,7 +52,7 @@ public:
             if (value) bitSet(bits[bit >> 3],inBytePos);
             else bitClear(bits[bit >> 3],inBytePos);
         } else {
-            for (uint16_t i = 0; i < bitsCount; ++i) {
+            for (uint16_t i = 0; i < bitsCount; i++) {
                 setBit(value,i);
             }
         }

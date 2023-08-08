@@ -8,14 +8,15 @@
 #include "adlib/MWArduinoLib.h"
 #include "MWOSDebug.h"
 #include "MWOSModuleBase.h"
-#include "MWOSPinsMain.h"
+#include "pins/MWOSPinsMain.h"
 #include "MWOSStorage.h"
 #include "MWOSUnit.h"
 #include "MWOSPins.h"
 #include "MWOSParent.h"
-#include "MWOSStorageRAM.h"
-#include "MWOSStorageEEPROM.h"
-#include "MWOSStorageStaticRAM.h"
+#include "storages/MWOSStorageRAM.h"
+#include "storages/MWOSStorageEEPROM.h"
+#include "storages/MWOSStorageStaticRAM.h"
+#include "core/MWOSConsts.h"
 
 
 #ifndef MWOS_DEBUG_BOUDRATE
@@ -23,7 +24,7 @@
 #endif
 
 #ifndef MWOS_PARAM_STORAGES_COUNT
-#ifndef MWOSStorageStaticRAM_NOT
+#ifndef MWOSStorageStaticRAM_NO
 // максимальное количество хранилищ (на контроллерах с поддержкой StaticRAM)
 #define MWOS_PARAM_STORAGES_COUNT 2
 #else
@@ -49,12 +50,6 @@ public:
      * Платы расширения добавлять так: mwos.pins.add(new MWOSPins());
      */
     MWOSPinsMain pins;
-
-    /***
-     * Можно задать информацию о контроллера
-     * это могут быть данные в json-формате
-     */
-    char * info;
 
     /***
      * Модуль времени (если нет - NULL)
@@ -91,14 +86,16 @@ public:
         MW_LOG(F("Project git hash: ")); MW_LOG_PROGMEM((char *) &git_hash_proj); MW_LOG_LN();
         MW_LOG(F("MWOS git hash: ")); MW_LOG_PROGMEM((char *) &git_hash_mwos); MW_LOG_LN();
         // добавим хранилища (если не задано раньше)
-#ifndef MWOS_NO_STORAGES
+#ifndef MWOS_AUTO_STORAGES_NO
+#ifndef MWOSStorageEEPROM_NO
         if (storageCount==0) AddStorage(new MWOSStorageEEPROM()); // если не задано бинарное хранилище, то создадим хранилище в EEPROM
-#ifndef MWOSStorageStaticRAM_NOT
+#endif
+#ifndef MWOSStorageStaticRAM_NO
         if (storageCount==1) AddStorage(new MWOSStorageStaticRAM()); // если задано только бинарное хранилище EEPROM, то создадим хранилище в StaticRAM (если платформа поддерживает)
 #endif
 #endif
         // создадим хранилища параметров
-        for (int storageType = 0; storageType < storageCount; ++storageType) {
+        for (uint8_t storageType = 0; storageType < storageCount; ++storageType) {
             uint32_t totalBitSize=0;
             MWOSModuleBase * moduleNext=(MWOSModuleBase *) child;
             while (moduleNext!=NULL && moduleNext->unitType==UnitType::MODULE) {
@@ -106,39 +103,42 @@ public:
                 moduleNext=(MWOSModuleBase *) moduleNext->next;
             }
             // сохраним
-            if (!storages[storageType]->onInit(0,totalBitSize+16)) { // EEPROM новый
-                MW_LOG(F("Storage save: ")); MW_LOG_LN(storageType);
+            if (!storages[storageType]->onInit(totalBitSize+16)) { // EEPROM новый
+                MW_LOG(F("Storage create ")); MW_LOG(storageType); MW_LOG('='); MW_LOG_LN(totalBitSize);
                 bitClear(storagesMask,storageType); // признак, что это хранилище ранее не было сохранено (настройки из базы данных серверера предпочтительнее)
                 int32_t bitOffset=0; // необходимо сохранить все значения по умолчанию
                 MWOSModuleBase * moduleNext=(MWOSModuleBase *) child;
                 while (moduleNext!=NULL && moduleNext->unitType==UnitType::MODULE) {
+                    MW_LOG(F("MODULE: ")); MW_LOG_PROGMEM(moduleNext->name); MW_LOG('='); MW_LOG_LN(moduleNext->paramsCount);
                     totalBitSize+=moduleNext->bitsSize(storageType);
                     MWOSParam * param=(MWOSParam *) moduleNext->child;
                     while (param!=NULL && param->unitType==UnitType::PARAM) {
-                        MW_LOG(F("MODULE: ")); MW_LOG(moduleNext->id); MW_LOG(F(", PARAM: ")); MW_LOG_LN(param->id);
                         if (param->storage==storageType) {
+                            MW_LOG(F("bits offset ")); MW_LOG_PROGMEM(moduleNext->name); MW_LOG(':'); MW_LOG_PROGMEM(param->name); MW_LOG('='); MW_LOG_LN(bitOffset);
                             int16_t bitSize=param->bitsSize(false);
-                            for (uint16_t index = 0; index < param->arrayCount(); ++index) {
+                            for (MWOS_PARAM_INDEX_UINT index = 0; index < param->arrayCount(); ++index) {
                                 storages[storageType]->saveValue(moduleNext->getValue(param, index), bitOffset, bitSize, false);   // сохранить значение параметра
                                 bitOffset+=bitSize;
                             }
                         }
-                        param=(MWOSParam *) moduleNext->next;
+                        param=(MWOSParam *) param->next;
                     }
                     moduleNext=(MWOSModuleBase *) moduleNext->next;
                 }
                 storages[storageType]->commit();
+                MW_LOG(F("Storage offset ")); MW_LOG(storageType); MW_LOG('='); MW_LOG_LN(bitOffset);
             } else { // прочитаем все хранилища
+                MW_LOG(F("Storage restore ")); MW_LOG(storageType); MW_LOG('='); MW_LOG_LN(totalBitSize);
                 bitSet(storagesMask,storageType); // признак, что это хранилище ранее было успешно сохранено (его настройки предпочтительнее настроек сервера)
                 MWOSModuleBase * moduleNext=(MWOSModuleBase *) child;
                 while (moduleNext!=NULL && moduleNext->unitType==UnitType::MODULE) {
                     MWOSParam * param=(MWOSParam *) moduleNext->child;
                     while (param!=NULL && param->unitType==UnitType::PARAM) {
                         MW_LOG(F("MODULE: ")); MW_LOG(moduleNext->id); MW_LOG(F(", PARAM: ")); MW_LOG_LN(param->id);
-                        for (uint16_t index = 0; index < param->arrayCount(); ++index) {
+                        for (MWOS_PARAM_INDEX_UINT index = 0; index < param->arrayCount(); ++index) {
                             moduleNext->getValue(param,index); // вызовем запрос параметра
                         }
-                        param=(MWOSParam *) moduleNext->next;
+                        param=(MWOSParam *) param->next;
                     }
                     moduleNext=(MWOSModuleBase *) moduleNext->next;
                 }
@@ -177,11 +177,13 @@ public:
      * @param pinNum Номер PIN
      * @return  Плата порта
      */
-    MWOSPins * pin(uint16_t pinNum) {
-        MWOSPins * res=&pins;
-        while (res!=NULL) {
-            if (res->isPin(pinNum)) return res;
-            res=res->next;
+    MWOSPins * pin(MWOS_PIN_INT pinNum) {
+        if (pinNum>=0) {
+            MWOSPins * res=&pins;
+            while (res!=NULL) {
+                if (res->isPin(pinNum)) return res;
+                res=res->next;
+            }
         }
         return new MWOSPins(); // если не нашли порт - то пустой класс
     }

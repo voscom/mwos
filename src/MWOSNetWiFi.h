@@ -120,7 +120,7 @@ public:
             MW_LOG_MODULE(this); MW_LOG(F("WiFi mode: ")); MW_LOG_LN(modeWiFi);
         }
         if (statusWiFi != WL_CONNECTED) {
-            if (connectedStep>7) {
+            if (connectedStep>STEP_SERVER_CONNECTING) {
                 onDisconnect();
             }
         }
@@ -167,6 +167,12 @@ public:
                 connectToServerSSH();
             }
 #endif
+            if (!_stream) {
+                MWAsyncClient * client=new MWAsyncClient((size_t) MWOS_SEND_BUFFER_SIZE);
+                _stream=client;
+                client->setTimeout((uint32_t) 6000); // таймаут 5 сек, чтобы успеть сбросить вачдог в 8 сек
+                MW_LOG_MODULE(this);  MW_LOG(F("MWOSController set stream: ")); MW_LOG_LN((uint16_t) MWOS_SEND_BUFFER_SIZE);
+            }
             MWOSNetIP::connectToServer();
         }
     }
@@ -207,7 +213,7 @@ public:
     }
 #endif
 
-    virtual bool isConnectedServer() { // есть подключение к серверу?
+    virtual bool isConnectedServer(bool firstTime) { // есть подключение к серверу?
         if (ap_mode) {
             if (server!=NULL) {
                 server->handleClient();
@@ -220,7 +226,7 @@ public:
             }
             return false;
         }
-        return MWOSNetIP::isConnectedServer();
+        return MWOSNetIP::isConnectedServer(firstTime);
     }
 
     virtual void startNet() { // аппаратно включить сеть
@@ -240,7 +246,7 @@ public:
     }
 
     virtual void closeNet() { // закрыть подключение к сети
-        disconnect();
+        MWOSNetIP::onDisconnect();
         stopWiFiAP();
         stopWiFi();
         MWOSNetIP::closeNet();
@@ -257,8 +263,8 @@ public:
 #endif
 #ifndef MWOS_WIFI_NOFAST_RECONNECT
         if ((!ap_mode) && (WiFi.status()==WL_CONNECTED)) { // если сейчас не режим сервера и к сети подключились
-            disconnect();
-            setConnectedStep(5); // сразу проверим подключение к сети
+            MWOSNetIP::onDisconnect();
+            setConnectedStep(STEP_NET_CONNECTING); // сразу проверим подключение к сети
             lastReciveTimeout.start(50); // повторим подключение к серверу через 10 сек
             connect_timeout.start(MWOS_NET_CONNECTNET_TIMEOUT);
         }
@@ -306,7 +312,7 @@ public:
         MW_LOG_MODULE(this);  MW_LOG(F("WiFi AP: "));  MW_LOG_LN(server_ssid);
         lastReciveTimeout.start(50);
         connect_timeout.start(200);
-        setConnectedStep(5);
+        setConnectedStep(STEP_NET_CONNECTING);
         countWiFiNoConnect=0;
     }
 

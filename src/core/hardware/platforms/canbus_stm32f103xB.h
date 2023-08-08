@@ -311,7 +311,7 @@ bool CAN_Init(uint8_t pinRx, uint8_t pinTx, uint16_t speedKBPS=250, int32_t filt
 
     // Set bit timing register
     CAN_bit_timing_config_t timings;
-    MW_LOG(F("bitrate=")); MW_LOG_LN(bitrate);
+    MW_LOG(F("bitrate=")); MW_LOG_LN(speedKBPS);
     uint32_t target_bitrate = speedKBPS * 1000;
     MW_LOG(F("target_bitrate=")); MW_LOG_LN(target_bitrate);
     int result = ComputeCANTimings(HAL_RCC_GetPCLK1Freq(), target_bitrate, &timings);

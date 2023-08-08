@@ -1,9 +1,9 @@
 #ifndef MWOS3_MWBUS_CAN_H
 #define MWOS3_MWBUS_CAN_H
 
+#include "MWBus64bit.h"
 #if defined(ESP32)
 #include "platforms/canbus_esp32.h"
-#include "MWBus64bit.h"
 
 #elif defined(STM32F103xB)
 #include "platforms/canbus_stm32f103xB.h"

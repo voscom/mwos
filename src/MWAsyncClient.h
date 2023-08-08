@@ -1,7 +1,6 @@
 #ifndef MWASYNCCLIENT_H_
 #define MWASYNCCLIENT_H_
-#if defined(ESP8266) || defined(ESP32)
-
+#if defined(ESP32) || defined(ESP8266)
 #include "Client.h"
 
 #ifndef ASYNC_TCP_SSL_ENABLED

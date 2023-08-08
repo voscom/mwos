@@ -31,7 +31,7 @@
 #include "adlib/MWTimeout.h"
 
 
-class MWOSDebug : public Stream {
+class MWOSDebug : public Print {
   public:
 	bool inited=false;
 #if MWOS_FILE_SYSTEM>0

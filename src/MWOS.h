@@ -6,6 +6,7 @@
 #define MWOS3_MWOS_H
 
 #include <Arduino.h>
+#include "core/MWOSConsts.h"
 
 #ifndef STM32_MCU_SERIES
 #ifdef STM32_CORE_VERSION

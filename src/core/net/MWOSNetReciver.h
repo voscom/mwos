@@ -142,7 +142,7 @@ public:
             case 10: // старший байт индекса массива
                 recive_args.array_index |=reciveByte << 8;
                 //MW_LOG(F("Recive index ")); MW_LOG_LN(recive_param_array_index);
-                if (recive_args.array_index<reciveParam->arrayCount()) {
+                if ((MWOS_PARAM_INDEX_UINT) recive_args.array_index < reciveParam->arrayCount()) {
                     recive_crc16.add(reciveByte);
                     if (cmd>15) { // это команда параметру с индексом массива (без аргументов)
                         _cmdMode=14; // сразу перейти к расчету контрольной суммы

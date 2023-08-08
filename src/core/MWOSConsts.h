@@ -1,6 +1,22 @@
 #ifndef MWOS3_MWOSCONSTS_H
 #define MWOS3_MWOSCONSTS_H
 
+#ifndef MWOS_MINIMUM_RAM // если не включен режим экономии ОЗУ - стандартные ограничения
+#define MWOS_PARAM_UINT uint16_t // какой переменной задается количество параметров uint16_t или uint8_t
+#define MWOS_PARAM_INT_PTYPE mwos_param_int16 // тип параметра модуля, для ссылки на номер параметра mwos_param_int16 или mwos_param_int8
+#define MWOS_PARAM_INDEX_UINT int16_t // какой переменной задается количество индексов в параметре int16_t или int8_t
+#define MWOS_PARAM_INDEX_UINT_PTYPE mwos_param_uint16 // тип параметра модуля, для ссылки на индекс параметра mwos_param_int16 или mwos_param_int8
+#define MWOS_PIN_INT int16_t // какой переменной задается порт микроконтроллера int16_t или int8_t
+#define MWOS_PIN_INT_PTYPE mwos_param_int16 // тип параметра модуля, для задания порта микроконтроллера mwos_param_int16 или mwos_param_int8
+#else // если включен режим экономии ОЗУ (актуально, для экономии памяти на 8-битных микроконтроллерах)
+#define MWOS_PARAM_UINT uint8_t // какой переменной задается количество параметров uint16_t или uint8_t
+#define MWOS_PARAM_INT_PTYPE mwos_param_int8 // тип параметра модуля, для ссылки на номер параметра mwos_param_int16 или mwos_param_int8
+#define MWOS_PARAM_INDEX_UINT uint8_t // какой переменной задается количество индексов в параметре int16_t или int8_t
+#define MWOS_PARAM_INDEX_UINT_PTYPE mwos_param_uint8 // тип параметра модуля, для ссылки на индекс параметра mwos_param_int16 или mwos_param_int8
+#define MWOS_PIN_INT int8_t // какой переменной задается порт микроконтроллера int16_t или int8_t
+#define MWOS_PIN_INT_PTYPE mwos_param_int8 // тип параметра модуля, для задания порта микроконтроллера mwos_param_int16 или mwos_param_int8
+#endif
+
 // команды от сервера
 // коды команд должны находиться в диапазоне:
 // 0-15 - команды параметру с данными,
@@ -53,6 +69,8 @@ enum MWOSParamGroup : uint8_t {
     mwos_param_sensor=2,
     // это настройки
     mwos_param_option=4,
+    // это ардес порта ввода/вывода
+    mwos_param_pin=8,
     // только для чтения (нельзя отправлять команду записи этого параметра)
     mwos_param_readonly=16,
     // секретный параметр (который никогда не отправляется с контроллера)
@@ -75,7 +93,7 @@ enum ModuleType : uint8_t {
 };
 
 // типы значений
-enum ParamValueType : int16_t {
+enum ParamValueType : uint8_t {
     mwos_param_string = 1,
     mwos_param_int8 = 2,
     mwos_param_uint8 = 3,
@@ -96,6 +114,7 @@ enum ParamValueType : int16_t {
     mwos_param_bits7 = 18,
     // массив однотипных значений. Пример задания: {mwos_param_array} * {кол-во элементов} + {mwos_param_int16}
     mwos_param_array = 32,
+    mwos_byte_array = 64,
 };
 
 // определим типы переменных
@@ -117,5 +136,6 @@ enum ParamValueType : int16_t {
 #define VALUE_mwos_param_bits5 uint8_t
 #define VALUE_mwos_param_bits6 uint8_t
 #define VALUE_mwos_param_bits7 uint8_t
+
 
 #endif //MWOS3_MWOSCONSTS_H

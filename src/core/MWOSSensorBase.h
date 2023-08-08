@@ -12,7 +12,7 @@
 #define MWOS_SENSOR_PULL_TIME_MS 50
 #endif
 
-template<uint16_t sensorsCount>
+template<MWOS_PARAM_INDEX_UINT sensorsCount>
 class MWOSSensorBase : public MWOSModule {
 public:
 #pragma pack(push,1)
@@ -30,24 +30,24 @@ public:
         };
     };
 
-    EverySensorBits _value_bin[sensorsCount];
+    EverySensorBits _value_bin[sensorsCount]; // бинарные показания (например: 0-вкл, 1-выкл)
     MWTimeout waitTimeout[sensorsCount];
     uint8_t _reserve:1;
     uint8_t waitPool:1;
-    uint8_t _invert:1;
-    uint8_t _pull_off:1;
-    uint8_t _always_off:1;
-    uint8_t _bin_to_log:1;
-    uint8_t _sensor_pull:2;
-    uint8_t _bin_filter=0;
-    uint16_t _get_timeout=0;
+    uint8_t _invert:1;      // инвертировать значение
+    uint8_t _pull_off:1;    // выключать подтяжку порта датчика между опросами
+    uint8_t _always_off:1;  //  всегда отключено (одновременно c sensor_invert - всегда включено)
+    uint8_t _bin_to_log:1;  //  сохранять бинарные показания в журнал
+    uint8_t _sensor_pull:2; //подтяжка (0-нет, 1-на 0, 2-на питание, 3 - открытый коллектор)
+    uint8_t _bin_filter=0;  // фильтр переключения бинарного значения [сек/10] (кратковременные переключения, меньше этого значения - игнорируются)
+    uint16_t _get_timeout=0; // Минимальное время [сек/10], между опросами показаний датчика
     MWTimeout lastRead;
 #pragma pack(pop)
     //************************ описание параметров ***********************/
 
     // бинарные показания (например: 0-вкл, 1-выкл)
     MWOS_PARAM(0, valueBin, mwos_param_bits1, mwos_param_sensor + mwos_param_readonly, mwos_param_storage_no, sensorsCount);
-    //MWOS_PARAM(1,sensor_pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom,sensorsCount);  // порты
+    //MWOS_PARAM(1,pin, MWOS_PARAM_PIN_INT, mwos_param_pin, mwos_param_storage_eeprom,sensorsCount);  // порты
     // фильтр переключения бинарного значения [сек/10] (кратковременные переключения, меньше этого значения - игнорируются)
     MWOS_PARAM(2, binFilter, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
     // Минимальное время [сек/10], между опросами показаний датчика
@@ -82,7 +82,7 @@ public:
         _bin_to_log=loadValue(_bin_to_log, &p_binToLog);
         _bin_filter=loadValue(_bin_filter, &p_binFilter);
         _get_timeout=loadValue(_get_timeout, &p_getTimeout);
-        for (size_t index = 0; index < sensorsCount; ++index) {
+        for (MWOS_PARAM_INDEX_UINT index = 0; index < sensorsCount; ++index) {
             initSensor(index,false);
         }
     }
@@ -125,7 +125,7 @@ public:
         if (lastRead.isTimeout()) {
             if (_pull_off) { // необходимо включить подтяжку перед измерением
                 if (!waitPool) {
-                    for (uint16_t index = 0; index < sensorsCount; ++index) initSensor(index,true);
+                    for (MWOS_PARAM_INDEX_UINT index = 0; index < sensorsCount; ++index) initSensor(index, true);
                     lastRead.startMS(MWOS_SENSOR_PULL_TIME_MS);
                     waitPool=true;
                     return; // чтобы не ждать пока устаканится подтяжка - проверим сенсоры в следующий раз
@@ -133,10 +133,10 @@ public:
                     waitPool=false;
                 }
             }
-            for (uint16_t index = 0; index < sensorsCount; index++) {
+            for (MWOS_PARAM_INDEX_UINT index = 0; index < sensorsCount; index++) {
                 readSensor(index);
             }
-            if (_pull_off) for (uint16_t index = 0; index < sensorsCount; ++index) initSensor(index, false); // выключим подтяжку
+            if (_pull_off) for (MWOS_PARAM_INDEX_UINT index = 0; index < sensorsCount; ++index) initSensor(index, false); // выключим подтяжку
             lastRead.start(_get_timeout);
         }
     }
@@ -155,6 +155,7 @@ public:
                 }
             }
             _value_bin[index].bin_value = newValueBin;
+            MW_LOG_MODULE(this); MW_LOG(F("sensor bin ")); MW_LOG(index); MW_LOG('='); MW_LOG_LN(newValueBin);
             if (_bin_to_log) {
                 toLog(newValueBin, &p_valueBin, index);
             } else

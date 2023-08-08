@@ -7,7 +7,7 @@
  * Несколько однотипных ключей (можно один)
  * Например: Это могут быть несколько реле на одном блоке
  */
-template<uint16_t keysCount>
+template<MWOS_PARAM_INDEX_UINT keysCount>
 class MWOSKey : public MWOSModule {
 public:
 
@@ -16,7 +16,7 @@ public:
     //uint8_t _value[keysCount];
     MWBitsMaskStat<keysCount> _turn;
     // порты
-    uint8_t _pin[keysCount];
+    MWOS_PIN_INT _pin[keysCount];
     // инвертировать значение
     uint8_t _invert:1;
     // всегда производить инициализацию ключа перед переключением
@@ -34,7 +34,7 @@ public:
     // состояния ключей (0-вкл, 1-выкл)
     MWOS_PARAM(0, turn, mwos_param_bits1, mwos_param_control, mwos_param_storage_rtc, keysCount);
     // порты
-    MWOS_PARAM(1, pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, keysCount);
+    MWOS_PARAM(1, pin, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, keysCount);
     // инвертировать значение
     MWOS_PARAM(2, invert, mwos_param_bits1, mwos_param_option, mwos_param_storage_eeprom, 1);
     // всегда производить инициализацию ключа перед переключением
@@ -55,22 +55,22 @@ public:
         AddParam(&p_alwaysoff);
         AddParam(&p_pull);
         AddParam(&p_checkbox);
-        for (uint16_t i = 0; i < keysCount; ++i) {
-            _pin[i]=255;
+        for (MWOS_PARAM_INDEX_UINT i = 0; i < keysCount; ++i) {
+            _pin[i]=-1;
         }
     }
 
     /***
      * Создать ключи
-     * @param ports ссылка на область PROGMEM с номерами портов по умолчанию
+     * @param ports ссылка на область PROGMEM с номерами портов по умолчанию (по 8 бит на порт)
      */
     MWOSKey(const uint8_t * pins) : MWOSKey() {
-        for (uint16_t i = 0; i < keysCount; ++i) {
+        for (MWOS_PARAM_INDEX_UINT i = 0; i < keysCount; ++i) {
             _pin[i]=pgm_read_byte_near(pins + i);
         }
     }
 
-    MWOSKey(uint8_t pin) : MWOSKey() {
+    MWOSKey(MWOS_PIN_INT pin) : MWOSKey() {
         _pin[0]=pin;
     }
 
@@ -80,7 +80,7 @@ public:
         _alwaysoff=loadValue(_alwaysoff, &p_alwaysoff);
         _pull=loadValue(_pull, &p_pull);
         _checkbox=loadValue(_checkbox, &p_checkbox);
-        for (uint16_t index = 0; index < keysCount; ++index) {
+        for (MWOS_PARAM_INDEX_UINT index = 0; index < keysCount; ++index) {
             _pin[index]=loadValue(_pin[index], &p_pin, index);
             _turn.setBit(loadValue(_turn.getBit(index), &p_turn, index),index);
             initKey(index);
@@ -147,7 +147,7 @@ public:
             MW_LOG_MODULE(this,index); MW_LOG('='); MW_LOG_LN(_turn.getBit(index));
             SetParamChanged(&p_turn, index, true); // отправить изменение ключа в стандартном порядке
             if (_checkbox && v==1) { // отключим другие ключи, если включен режим checkbox
-                for (int16_t i = 0; i < keysCount; ++i) if (i!=index) { // все ключи, кроме этого
+                for (MWOS_PARAM_INDEX_UINT i = 0; i < (int32_t) keysCount; ++i) if (i != index) { // все ключи, кроме этого
                         turnBool(false,i); // отключим ключ
                 }
             }
@@ -156,7 +156,7 @@ public:
                 else v=1;
             }
             if (_reinit) initKey(index);
-            mwos.pin(_pin[index])->writeDigital(v);
+            if (_pin[index]>=0) mwos.pin(_pin[index])->writeDigital(v);
             if (saveToStorage) saveValue(old_v, &p_turn, index);
         }
 

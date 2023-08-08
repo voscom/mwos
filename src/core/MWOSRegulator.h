@@ -19,9 +19,9 @@ public:
     // значение скваженности
     MWOS_PARAM(2, value2, mwos_param_uint32, mwos_param_option, mwos_param_storage_eeprom, 1);
     // порт
-    MWOS_PARAM(3, pin, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(3, pin, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, 1);
 
-    uint8_t _pin;
+    MWOS_PIN_INT _pin=-1;
     uint32_t _value=0;
     uint32_t _value2=50;
     bool started= false;
@@ -31,10 +31,10 @@ public:
         AddParam(&p_value);
         AddParam(&p_value2);
         AddParam(&p_pin);
-        _pin=255;
+        _pin=-1;
     }
 
-    MWOSRegulator(uint8_t pin) : MWOSRegulator() {
+    MWOSRegulator(MWOS_PIN_INT pin) : MWOSRegulator() {
         _pin=pin;
     }
 

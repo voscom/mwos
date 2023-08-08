@@ -6,6 +6,14 @@
 #endif
 #include <stdlib.h>
 
+#ifdef _GLIBCXX_STD_FUNCTION_H
+#define voidFuncPtr std::function<void(void)>
+#else
+typedef void (*voidFuncPtr)(void);
+    voidFuncPtr _callback=NULL;
+#endif
+
+
 //#define timeoutStopMKS 50000 // таймаут, через который энкодер считать остановленным [микросекунд] [1 / 1 000 000 сек] если не задано то этот функционал отключен
 
 /***
@@ -45,9 +53,9 @@ public:
 #pragma pack(push,1)
     int32_t _position=0;
     uint8_t _direction=MWOSEncoderDirection::STOP;
-    uint8_t _pinA=255;
-    uint8_t _pinB=255;
-    uint8_t _pinRef=255;
+    MWOS_PIN_INT _pinA=-1;
+    MWOS_PIN_INT _pinB=-1;
+    MWOS_PIN_INT _pinRef=-1;
     int32_t _minimum=INT32_MIN;
     int32_t _maximum=INT32_MAX;
     int16_t _filter=0;
@@ -75,11 +83,11 @@ public:
     // направление движения (0-назад, 1-вперед, 2-останов)
     MWOS_PARAM(2, direction, mwos_param_bits2, (MWOSParamGroup) (mwos_param_sensor + mwos_param_readonly), mwos_param_storage_no, 1);
     // порт A
-    MWOS_PARAM(3, pinA, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(3, pinA, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, 1);
     // порт B
-    MWOS_PARAM(4, pinB, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(4, pinB, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, 1);
     // порт раференции
-    MWOS_PARAM(5, pinRef, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(5, pinRef, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, 1);
     // минимум
     MWOS_PARAM(6, minimum, mwos_param_int32, mwos_param_option, mwos_param_storage_eeprom, 1);
     // максимум
@@ -133,7 +141,7 @@ public:
         _invertSignal=0;
     }
 
-    MWOSEncoder(uint8_t pinA,uint8_t pinB,uint8_t pinRef=255) : MWOSEncoder() {
+    MWOSEncoder(MWOS_PIN_INT pinA,MWOS_PIN_INT pinB,MWOS_PIN_INT pinRef=-1) : MWOSEncoder() {
         _pinA = pinA;
         _pinB = pinB;
         _pinRef = pinRef;
@@ -143,17 +151,17 @@ public:
         _position=loadValue(_position, &p_position);
         // настроим порты
         _pull=loadValue(_pull, &p_pull);
-        _pinA=loadValue(255, &p_pinA);
-        if (_pinA<255) mwos.pin(_pinA)->mode(false, _pull);
-        _pinB=loadValue(255, &p_pinB);
-        if (_pinB<255) {
+        _pinA=loadValue(-1, &p_pinA);
+        if (_pinA>=0) mwos.pin(_pinA)->mode(false, _pull);
+        _pinB=loadValue(-1, &p_pinB);
+        if (_pinB>=0) {
             mwos.pin(_pinB)->mode(false, _pull);
 #ifdef STM32_MCU_SERIES
             _pinBName=digitalPinToPinName(_pinB);
 #endif
         }
-        _pinRef=loadValue(255, &p_pinRef);
-        if (_pinRef<255) mwos.pin(_pinRef)->mode(false, _pull);
+        _pinRef=loadValue(-1, &p_pinRef);
+        if (_pinRef>=0) mwos.pin(_pinRef)->mode(false, _pull);
         // прочитаем все настройки
         _maximum=loadValue(_maximum, &p_maximum);
         _minimum=loadValue(_minimum, &p_minimum);
@@ -167,7 +175,7 @@ public:
         _invertDirection=loadValue(_invertDirection, &p_invertDirection);
         _invertSignal=loadValue(_invertSignal, &p_invertSignal);
         initedSoft= false;
-        if (_pinA<255 && _pinB<255) {
+        if (_pinA>=0 && _pinB>=0) {
             initedSoft=(_type == MWOSEncoderType::USE_SOFTWARE);
             if (_type==MWOSEncoderType::USE_INTERRUPT) {
                 detachInterrupt(digitalPinToInterrupt(_pinA));
@@ -248,7 +256,7 @@ public:
      * @param pos
      * @param callback
      */
-    void setPosEvent(int32_t pos,std::function<void(void)> callback) {
+    void setPosEvent(int32_t pos,voidFuncPtr callback) {
         _callback = callback;
         targetPos=pos;
     }
@@ -282,7 +290,7 @@ public:
     }
 
 private:
-    std::function<void(void)> _callback=NULL;
+    voidFuncPtr _callback=NULL;
     int32_t targetPos=INT32_MAX;
     bool lastPortA=false;
 };
