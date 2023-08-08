@@ -11,9 +11,9 @@ pio run -e платформа
 (микроконтроллер должен быть подключен к вашему ПК). 
 
 Платформы уже прописаны в [platformio.ini](platformio.ini):
-1. [esp32-s3-devkitc-1](./platform/sp32-s3-devkitc-1/README.md)
+1. [esp32-s3-devkitc-1](./platform/esp32-s3-devkitc-1/README.md)
 2. [megaatmega2560](./platform/megaatmega2560/README.md)
-3. [esp32dev](./platform/esp32dev/README.md)
+3. [esp32dev](./platform/esp32doit-devkit-v1/README.md)
 4. [bluepill_f103c8](./platform/bluepill_f103c8/README.md)
 5. [blackpill_f411ce](./platform/blackpill_f411ce/README.md)
 
