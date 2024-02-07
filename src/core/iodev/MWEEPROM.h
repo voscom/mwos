@@ -59,9 +59,9 @@ public:
     virtual int available() { return 0; }
     virtual int peek() { return 0; }
 
-    void clear() {
+    void clear(uint16_t addr=0) {
     	if (!inited) begin();
-		writeWord(0, 0xffff); // очистим первые 2 байта - этого достаточно
+		writeWord(addr, 0xffff); // очистим первые 2 байта - этого достаточно
 		commit();
     }
 

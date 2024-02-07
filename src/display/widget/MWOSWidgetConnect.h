@@ -46,10 +46,7 @@ public:
         _color=WHITE;
         _x= displayModule->display->width() - bmpConnect_width - 1; // по умолчанию - покажем в правом верхнем углу
         _y=0;
-    }
-
-    virtual void onInit() {
-        MWOSWidget::onInit();
+        _visible= true;
     }
 
     virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
@@ -83,6 +80,7 @@ public:
      * Показать статус подключения на дисплее
      */
     void print() {
+        if (_visible==0) return;
         MW_LOG_MODULE(this); MW_LOG(F("print: ")); MW_LOG_LN(_connected);
         if (_connected>0) displayModule->display->drawBitmap(_x, _y, bmpConnect, bmpConnect_width, bmpConnect_height, _color);
         if (_connected<2) {

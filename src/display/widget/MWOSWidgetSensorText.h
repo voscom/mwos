@@ -62,6 +62,7 @@ public:
      * Вызывается каждый тик операционной системы
      */
     virtual void onUpdate() {
+        if (_visible==0) return;
         if (timeout.isTimeout()) {
             if (_sensor!=NULL && _sensorIndex>=0) {
                 int64_t nowSensorValue=_sensor->getValue(sensorParam,_sensorIndex);

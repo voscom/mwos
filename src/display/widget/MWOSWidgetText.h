@@ -71,6 +71,7 @@ public:
      * Обновляет виджет на экране
      */
     virtual void print() {
+        if (_visible==0) return;
         displayModule->display->setCursor(_x, _y);
         displayModule->display->setTextSize(_sizeX,_sizeY);
         displayModule->display->setTextColor(_color);
