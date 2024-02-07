@@ -33,10 +33,7 @@ void wdt_enable (int wdtTimeout) {
 void wdt_reset() {
 	if (timerWDT!=NULL) timerWrite(timerWDT, 0); //reset timer (feed watchdog)
 }
-#endif
-
-
-#if defined(STM32_MCU_SERIES)
+#elif defined(STM32_MCU_SERIES)
 #include <Arduino.h>
 #include <libmaple/iwdg.h>
 void wdt_disable () {
@@ -47,6 +44,8 @@ void wdt_enable (int wdtTimeout) {
 void wdt_reset() {
 	iwdg_feed();
 }
+#else
+#include <avr/wdt.h>
 #endif
 
 #endif

@@ -63,18 +63,6 @@
 #define	MWOS_WIFI_PASS	NULL
 #endif
 
-#ifndef MW_Controller_IP
-#define MW_Controller_IP {192,168,0,177}
-#endif
-
-#ifndef MWOS_SERVER_HOST
-#define MWOS_SERVER_HOST "voscom.online"
-#endif
-
-#ifndef MWOS_SERVER_PORT
-#define MWOS_SERVER_PORT 8080
-#endif
-
 const char * server_ssid = MWOS_WIFI_NAME_ID;
 const char * server_password = MWOS_WIFI_PASS;
 

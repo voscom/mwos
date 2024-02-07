@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include "core/MWOSConsts.h"
+#include "core/adlib/MWWDT.h"
 
 #ifndef STM32_MCU_SERIES
 #ifdef STM32_CORE_VERSION

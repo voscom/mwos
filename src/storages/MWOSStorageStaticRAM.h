@@ -25,7 +25,7 @@
 #endif
 
 #ifdef ESP8266
-#include "core/hardware/platforms/MWOSStorageEsp8266RTC.h"
+#include "storages/MWOSStorageEsp8266RTC.h"
 #define MWOSStorageParentStaticRAM MWOSStorageEsp8266RTC // для ESP8266 используем RTC-память
 #endif
 

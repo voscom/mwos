@@ -13,9 +13,12 @@
 #define MWOS_STORAGE_BKP_REGISTER_OFFSET 4 // первый BKP регистра, для хранилища
 #endif
 
+const char MWOSStorageSTM32BKPReg_Name[] PROGMEM = {"STM32_BKP_REG"};
+
 class MWOSStorageSTM32BKPReg : public MWOSStorage {
 public:
     MWOSStorageSTM32BKPReg() : MWOSStorage() {
+        setName((char *) &MWOSStorageSTM32BKPReg_Name);
     }
 
     virtual uint8_t read(size_t byteOffset) {
@@ -39,10 +42,6 @@ public:
         setBackupRegister(regAddr,regData);
         MW_LOG(F("BKP reg write "));  MW_LOG(regAddr); MW_LOG('='); MW_LOG_LN(regData,HEX);
         disableBackupDomain();
-    }
-
-    virtual void commit() {
-
     }
 
 };

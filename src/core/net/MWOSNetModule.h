@@ -53,12 +53,13 @@ enum MWOSNetStep : int8_t {
 class MWOSNetModule : public MWOSModule, public MWOSNetReciver {
 public:
 #pragma pack(push,1)
-    uint32_t cid=MWOS_CONTROLLER_ID; // код контроллера, присвоенный сервером при первой авторизации. MWOS_CONTROLLER_ID - это предпочитаемый код (если он еще не занят на серврере)
+    uint32_t cid=0; // код контроллера, присвоенный сервером при первой авторизации. MWOS_CONTROLLER_ID - это предпочитаемый код (если он еще не занят на серврере)
     MWOSNetStep connectedStep=STEP_NET_CLOSE;
+    uint8_t IsCidSaved= false;
 #pragma pack(pop)
 
     // код контроллера
-    MWOS_PARAM(0, controllerId, mwos_param_uint32, mwos_param_readonly, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(0, controllerId, mwos_param_uint32, mwos_param_readonly+mwos_param_option, mwos_param_storage_eeprom, 1);
 
     MWOSNetModule(char * unit_name) : MWOSModule(unit_name) {
         AddParam(&p_controllerId);
@@ -67,13 +68,31 @@ public:
 
     virtual void onInit() {
         MWOSModule::onInit();
-        cid=loadValue(cid,&p_controllerId,0);
-        MW_LOG_MODULE(this); MW_LOG(F("load id ")); MW_LOG_LN(cid);
+        uint32_t cidSaved=loadValue(0,&p_controllerId,0);
+        IsCidSaved=(cidSaved>0);
+        if (IsCidSaved) {
+            cid=cidSaved;
+            MW_LOG_MODULE(this); MW_LOG(F("load CID: ")); MW_LOG_LN(cid);
+        } else {
+            MW_LOG_MODULE(this); MW_LOG(F("default CID: ")); MW_LOG_LN(cid);
+        }
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         if (param==&p_controllerId) return cid;
         return MWOSModule::getValue(param,arrayIndex);
+    }
+
+    virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex) {
+        if (param==&p_controllerId) {
+            if (IsCidSaved || value<1) return;
+            cid=value;
+            saveValue(value,param,arrayIndex); // сохраним в хранилище
+            IsCidSaved=true;
+            SetParamChanged(param,0, true);
+            MW_LOG_MODULE(this); MW_LOG(F("New CID: ")); MW_LOG_LN((uint32_t) value);
+        } else
+            MWOSModule::setValue(value,param,arrayIndex);
     }
 
     virtual void onUpdate() {
@@ -87,8 +106,6 @@ public:
                sendUpdate();
             if (_cmdMode>0 && recive_block_timeout.isStarted() && recive_block_timeout.isTimeout()) reciveClear(20); // вышел таймаут приема
         }
-
-
         connectedStepRun();
     }
 

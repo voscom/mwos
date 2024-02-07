@@ -44,13 +44,13 @@ public:
     /**
      * Записать бит
      * @param value
-     * @param bit   Номер бита. Если больше bitsCount то задать это значение всем битам
+     * @param bitOffset   Номер бита. Если больше bitsCount то задать это значение всем битам
      */
-    void setBit(bool value, uint16_t bit) {
-        if (bit<bitsCount) {
-            uint8_t inBytePos=bit & 7;
-            if (value) bitSet(bits[bit >> 3],inBytePos);
-            else bitClear(bits[bit >> 3],inBytePos);
+    void setBit(bool value, uint16_t bitOffset) {
+        if (bitOffset<bitsCount) {
+            uint8_t inBytePos=bitOffset & 7;
+            if (value) bitSet(bits[bitOffset >> 3],inBytePos);
+            else bitClear(bits[bitOffset >> 3],inBytePos);
         } else {
             for (uint16_t i = 0; i < bitsCount; i++) {
                 setBit(value,i);
@@ -60,11 +60,11 @@ public:
 
     /**
      * Прочитать бит
-     * @param bit
+     * @param bitOffset
      * @return
      */
-    bool getBit(uint16_t bit) {
-        if (bit<bitsCount) return bitRead(bits[bit >> 3],bit);
+    bool getBit(uint16_t bitOffset) {
+        if (bitOffset<bitsCount) return bitRead(bits[bitOffset >> 3],bitOffset);
         return false;
     }
 

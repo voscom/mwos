@@ -8,18 +8,19 @@ extern "C" {
 #include "Arduino.h"
 
 #include "Ethernet2.h"
-#include "AsyncEthernetClient.h"
+#include "AsyncEthernetClientW5500.h"
 #include "Dns.h"
 
-uint16_t AsyncEthernetClient::_srcport = 1024;
+uint16_t AsyncEthernetClientW5500::_srcport = 1024;
 
-AsyncEthernetClient::AsyncEthernetClient() : _sock(MAX_SOCK_NUM) {
+AsyncEthernetClientW5500::AsyncEthernetClientW5500() : _sock(MAX_SOCK_NUM) {
 }
 
-AsyncEthernetClient::AsyncEthernetClient(uint8_t sock) : _sock(sock) {
+AsyncEthernetClientW5500::AsyncEthernetClientW5500(uint8_t sock) : _sock(sock) {
 }
 
-int AsyncEthernetClient::connect(const char* host, uint16_t port) {
+
+int AsyncEthernetClientW5500::connect(const char* host, uint16_t port) {
     // Look up the host first
     int ret = 0;
     DNSClient dns;
@@ -34,7 +35,7 @@ int AsyncEthernetClient::connect(const char* host, uint16_t port) {
     }
 }
 
-int AsyncEthernetClient::connect(IPAddress ip, uint16_t port) {
+int AsyncEthernetClientW5500::connect(IPAddress ip, uint16_t port) {
     if (_sock != MAX_SOCK_NUM)
         return 0;
 
@@ -66,11 +67,11 @@ int AsyncEthernetClient::connect(IPAddress ip, uint16_t port) {
     return 1;
 }
 
-size_t AsyncEthernetClient::write(uint8_t b) {
+size_t AsyncEthernetClientW5500::write(uint8_t b) {
     return write(&b, 1);
 }
 
-size_t AsyncEthernetClient::write(const uint8_t *buf, size_t size) {
+size_t AsyncEthernetClientW5500::write(const uint8_t *buf, size_t size) {
     if (_sock == MAX_SOCK_NUM) {
         setWriteError();
         return 0;
@@ -82,13 +83,13 @@ size_t AsyncEthernetClient::write(const uint8_t *buf, size_t size) {
     return size;
 }
 
-int AsyncEthernetClient::available() {
+int AsyncEthernetClientW5500::available() {
     if (_sock != MAX_SOCK_NUM)
         return w5500.getRXReceivedSize(_sock);
     return 0;
 }
 
-int AsyncEthernetClient::read() {
+int AsyncEthernetClientW5500::read() {
     uint8_t b;
     if ( recv(_sock, &b, 1) > 0 )
     {
@@ -102,11 +103,11 @@ int AsyncEthernetClient::read() {
     }
 }
 
-int AsyncEthernetClient::read(uint8_t *buf, size_t size) {
+int AsyncEthernetClientW5500::read(uint8_t *buf, size_t size) {
     return recv(_sock, buf, size);
 }
 
-int AsyncEthernetClient::peek() {
+int AsyncEthernetClientW5500::peek() {
     uint8_t b;
     // Unlike recv, peek doesn't check to see if there's any data available, so we must
     if (!available())
@@ -115,11 +116,11 @@ int AsyncEthernetClient::peek() {
     return b;
 }
 
-void AsyncEthernetClient::flush() {
+void AsyncEthernetClientW5500::flush() {
     ::flush(_sock);
 }
 
-void AsyncEthernetClient::stop() {
+void AsyncEthernetClientW5500::stop() {
     if (_sock == MAX_SOCK_NUM)
         return;
 
@@ -128,7 +129,7 @@ void AsyncEthernetClient::stop() {
     unsigned long start = millis();
 
     // wait a second for the connection to close
-    while (status() != SnSR::CLOSED && millis() - start < 1000)
+    while (status() != SnSR::CLOSED && millis() - start < 80)
         delay(1);
 
     // if it hasn't closed, close it forcefully
@@ -139,15 +140,20 @@ void AsyncEthernetClient::stop() {
     _sock = MAX_SOCK_NUM;
 }
 
-uint8_t AsyncEthernetClient::connected() {
+uint8_t AsyncEthernetClientW5500::connected() {
     if (_sock == MAX_SOCK_NUM) return 0;
 
     uint8_t s = status();
     return !(s == SnSR::LISTEN || s == SnSR::CLOSED || s == SnSR::FIN_WAIT ||
+            s==21 ||
              (s == SnSR::CLOSE_WAIT && !available()));
 }
 
-uint8_t AsyncEthernetClient::status() {
+int AsyncEthernetClientW5500::availableForWrite() {
+    return w5500.getTXFreeSize(_sock);
+}
+
+uint8_t AsyncEthernetClientW5500::status() {
     if (_sock == MAX_SOCK_NUM) return SnSR::CLOSED;
     return w5500.readSnSR(_sock);
 }
@@ -155,10 +161,10 @@ uint8_t AsyncEthernetClient::status() {
 // the next function allows us to use the client returned by
 // EthernetServer::available() as the condition in an if-statement.
 
-AsyncEthernetClient::operator bool() {
+AsyncEthernetClientW5500::operator bool() {
     return _sock != MAX_SOCK_NUM;
 }
 
-bool AsyncEthernetClient::operator==(const AsyncEthernetClient& rhs) {
+bool AsyncEthernetClientW5500::operator==(const AsyncEthernetClientW5500& rhs) {
     return _sock == rhs._sock && _sock != MAX_SOCK_NUM && rhs._sock != MAX_SOCK_NUM;
 }

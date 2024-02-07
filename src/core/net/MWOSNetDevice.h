@@ -76,7 +76,7 @@ public:
         }
         switch (connectedStep) {
             case STEP_NET_CLOSE: // отключим подключение к сети
-                IsConnected= false;
+                if (IsConnected) onDisconnect();
                 connect_timeout.start(MWOS_NET_RESTART_TIMEOUT);
                 closeNet();
                 setConnectedStep(STEP_NET_CLOSING);
@@ -105,8 +105,10 @@ public:
                 } else if (connect_timeout.isTimeout()) {
                     MW_LOG_MODULE(this); MW_LOG_LN(F("Net Error!"));
                     setConnectedStep(STEP_NET_CLOSE);
-                    if (IsConnected) setStatusForGates(false);
-                    IsConnected=false;
+                    if (IsConnected) {
+                        setStatusForGates(false);
+                        onDisconnect();
+                    }
                 }
                 return;
             case STEP_SERVER_CONNECT: // подключимся к серверу
@@ -124,7 +126,7 @@ public:
                 else if (connect_timeout.isTimeout()) onDisconnect(); // отвалиться через 20 сек, если не подключились
                 return;
             case STEP_SERVER_HANDSHAKE: // отправляем хендшейк
-                if (writeHandshake(cid)>0) {
+                if (frameHandshake(cid)>0) {
                     setConnectedStep(STEP_SERVER_WAIT_ID);
                     connect_timeout.start(MWOS_NET_CONTROLLER_ID_TIMEOUT); // отвалиться через несколько сек, если не пришел код контроллера
                     lastReciveTimeout.stop(); // остановим таймаут приемки данных (его стартует при получении пакета от сервера)

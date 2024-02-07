@@ -8,28 +8,36 @@
 #include "MWOSKeyExt.h"
 #include "core/MWOSSensorBase.h"
 
+#ifndef MWOSKeyForSwitch // можно переопределить наследников для переключателей (MWOSKey или его потомки)
+#if (MWOS_MINIMUM_RAM==1)
+#define MWOSKeyForSwitch MWOSKey
+#else
+#define MWOSKeyForSwitch MWOSKeyExt
+#endif
+#endif
+
 template<MWOS_PARAM_INDEX_UINT keysCount>
-class MWOSKeySwitch : public MWOSKeyExt<keysCount> {
+class MWOSKeySwitch : public MWOSKeyForSwitch<keysCount> {
 public:
 #pragma pack(push,1)
     MWOSModuleBase * _sensor;
     MWOS_PARAM_INDEX_UINT _pIndex[keysCount];
     MWBitsMaskStat<keysCount> _lastSensorsValue;
-    //int8_t _last_sensor_bin[keysCount]; // последние бинарные значения
+    MWTimeout initTimeout;
 #pragma pack(pop)
 
 
     // ************ описание параметров *****************
     // датчик для управления этим переключателем
-    MWOS_PARAM(10, sensorModuleId, mwos_param_uint16, mwos_param_option, mwos_param_storage_eeprom, 1);
+    MWOS_PARAM(21, sensorModuleId, MWOS_PARAM_UINT_PTYPE, mwos_param_module_id+mwos_param_option, mwos_param_storage_eeprom, 1);
     // индексы параметра 0 этого датчика (если там много однотипных датчиков, то каждый из этих датчиков может управлять своим ключом в этом модуле)
-    MWOS_PARAM(11, sensorIndex, mwos_param_uint16, mwos_param_option, mwos_param_storage_eeprom, keysCount);
+    MWOS_PARAM(22, sensorIndex, MWOS_PARAM_INDEX_UINT_PTYPE, mwos_param_option, mwos_param_storage_eeprom, keysCount);
 
     /***
      * Создать ключи
      * @param ports ссылка на область PROGMEM с номерами портов по умолчанию
      */
-    MWOSKeySwitch(const uint8_t * pins) : MWOSKeyExt<keysCount>(pins) {
+    MWOSKeySwitch(const uint8_t * pins) : MWOSKeyForSwitch<keysCount>(pins) {
         initKeySwitch();
     }
 
@@ -37,7 +45,7 @@ public:
      * Создать ключи.
      * Предполагается, что порты будут загружены среди всех прочих настроек
      */
-    MWOSKeySwitch() : MWOSKeyExt<keysCount>() {
+    MWOSKeySwitch() : MWOSKeyForSwitch<keysCount>() {
         initKeySwitch();
     }
 
@@ -45,7 +53,7 @@ public:
      * Создать ключи. Удобнее при создании одного ключа.
      * @param pin порт первого ключа
      */
-    MWOSKeySwitch(MWOS_PIN_INT pin) : MWOSKeyExt<keysCount>() {
+    MWOSKeySwitch(MWOS_PIN_INT pin) : MWOSKeyForSwitch<keysCount>() {
         initKeySwitch();
     }
 
@@ -58,33 +66,49 @@ public:
     }
 
     virtual void onInit() {
-        MWOSKeyExt<keysCount>::onInit();
-        _sensor=mwos.getModule(MWOSModule::loadValue(-1, &p_sensorModuleId, 0));
+        MWOSKeyForSwitch<keysCount>::onInit();
+        _sensor=NULL;
+        initTimeout.start(10); // перечитаем датчики через 1 сек (что-бы они уже имели правильные показания)
+    }
+
+    void loadSensors() {
+        initTimeout.stop();
+        MW_LOG_MODULE(this); MW_LOG_LN(F("loadSensors..."));
+        int16_t _sensor_id=MWOSModule::loadValue(-1, &p_sensorModuleId, 0);
+        if (_sensor_id<2) return;
+        _sensor=mwos.getModule(_sensor_id);
         if (_sensor==NULL) return;
         MWOSParam * sensorParam0=_sensor->getParam(0);
-        if (sensorParam0==NULL || !sensorParam0->IsGroup(mwos_param_sensor)) {
+        if (sensorParam0==NULL || sensorParam0->group!=mwos_param_readonly || sensorParam0->valueType!=mwos_param_bits1) { // любой другой тип, кроме ридонли
             _sensor=NULL; // удалим не датчики
             return;
         }
         for (MWOS_PARAM_INDEX_UINT index = 0; index < keysCount; ++index) {
             _pIndex[index]=MWOSModule::loadValue(0, &p_sensorIndex, index);
-            if (sensorParam0->arrayCount()<=_pIndex[index]) _pIndex[index]=0; // индекс не может быть больше длины массива параметра
-            _lastSensorsValue.setBit(_sensor->getValue(0,_pIndex[index]),index); // прочитаем текущее значение датчика
+            if (sensorParam0->arrayCount()>_pIndex[index]) { // индекс не может быть больше длины массива параметра
+                int8_t nowSensorValue=_sensor->getValue(0,_pIndex[index]);
+                _lastSensorsValue.setBit(nowSensorValue,index); // прочитаем текущее значение датчика
+            }
         }
-
     }
 
     /***
      * Вызывается каждый тик операционной системы
      */
     virtual void onUpdate() {
-        MWOSKeyExt<keysCount>::onUpdate();
-        if (_sensor==NULL) return;
-        for (MWOS_PARAM_INDEX_UINT index = 0; index < keysCount; ++index)  {
-            int8_t nowSensorValue=_sensor->getValue(0,_pIndex[index]);
-            if (_lastSensorsValue.getBit(index)!=nowSensorValue) {
-                MWOSKeyExt<keysCount>::turn(2,index,true);
-                _lastSensorsValue.setBit(nowSensorValue,index);
+        MWOSKeyForSwitch<keysCount>::onUpdate();
+        if (_sensor==NULL) {
+            if (initTimeout.isStarted() && initTimeout.isTimeout()) loadSensors();
+            return;
+        }
+        for (MWOS_PARAM_INDEX_UINT index = 0; index < keysCount; ++index) {
+            MWOSParam * sensorParam0=_sensor->getParam(0);
+            if (sensorParam0!=NULL && sensorParam0->arrayCount()>_pIndex[index]) {
+                int8_t nowSensorValue=_sensor->getValue(sensorParam0,_pIndex[index]);
+                if (_lastSensorsValue.getBit(index)!=nowSensorValue) {
+                    MWOSKeyForSwitch<keysCount>::turn(2,index,true);
+                    _lastSensorsValue.setBit(nowSensorValue,index);
+                }
             }
         }
     }

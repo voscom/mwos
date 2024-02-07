@@ -27,12 +27,20 @@ public:
     uint8_t _pull:2;
     // влияние на другие ключи этого модуля: 0-нет, 1-выключить все другие при включении этого
     uint8_t _checkbox:1;
-    // резерв для выравнивания по байту
-    uint8_t _reserve:2;
+    // Значение turn при включении микроконтроллера, если не записано в хранилище или включено dontLoadTurn (без учета инверсии)
+    uint8_t _startTurn:1;
+    // Значение turn при включении микроконтроллера
+    // Если 0, то читает значение turn из хранилища MWOS_PARAM_STORAGE_KEY_TURN (если значение сохранено ранее в хранилище)
+    // если 1 - то значение = startTurn
+    uint8_t _dontLoadTurn:1;
 #pragma pack(pop)
 
+#ifndef MWOS_PARAM_STORAGE_KEY_TURN
+#define MWOS_PARAM_STORAGE_KEY_TURN mwos_param_storage_rtc
+#endif
+
     // состояния ключей (0-вкл, 1-выкл)
-    MWOS_PARAM(0, turn, mwos_param_bits1, mwos_param_control, mwos_param_storage_rtc, keysCount);
+    MWOS_PARAM(0, turn, mwos_param_bits1, mwos_param_control, MWOS_PARAM_STORAGE_KEY_TURN, keysCount);
     // порты
     MWOS_PARAM(1, pin, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, keysCount);
     // инвертировать значение
@@ -45,6 +53,12 @@ public:
     MWOS_PARAM(5, pull, mwos_param_bits2, mwos_param_option, mwos_param_storage_eeprom, 1);
     // влияние на другие ключи этого модуля: 0-нет, 1-выключить все другие при включении этого
     MWOS_PARAM(6, checkbox, mwos_param_bits1, mwos_param_option, mwos_param_storage_eeprom, 1);
+    // Значение turn при включении микроконтроллера, если не записано в хранилище или включено dontLoadTurn (без учета инверсии)
+    MWOS_PARAM(7, startTurn, mwos_param_bits1, mwos_param_option, mwos_param_storage_eeprom, 1);
+    // Значение turn при включении микроконтроллера
+    // Если 0, то читает значение turn из хранилища MWOS_PARAM_STORAGE_KEY_TURN (если значение сохранено ранее в хранилище)
+    // если 1 - то значение = startTurn и значение ключа не сохраняется в хранилище
+    MWOS_PARAM(8, dontLoadTurn, mwos_param_bits1, mwos_param_option, mwos_param_storage_eeprom, 1);
 
 
     MWOSKey() : MWOSModule((char *) F("key")) {
@@ -55,6 +69,8 @@ public:
         AddParam(&p_alwaysoff);
         AddParam(&p_pull);
         AddParam(&p_checkbox);
+        AddParam(&p_startTurn);
+        AddParam(&p_dontLoadTurn);
         for (MWOS_PARAM_INDEX_UINT i = 0; i < keysCount; ++i) {
             _pin[i]=-1;
         }
@@ -80,15 +96,19 @@ public:
         _alwaysoff=loadValue(_alwaysoff, &p_alwaysoff);
         _pull=loadValue(_pull, &p_pull);
         _checkbox=loadValue(_checkbox, &p_checkbox);
+        _startTurn=loadValue(_startTurn, &p_startTurn);
+        _dontLoadTurn=loadValue(_dontLoadTurn, &p_dontLoadTurn);
         for (MWOS_PARAM_INDEX_UINT index = 0; index < keysCount; ++index) {
             _pin[index]=loadValue(_pin[index], &p_pin, index);
-            _turn.setBit(loadValue(_turn.getBit(index), &p_turn, index),index);
             initKey(index);
-            turn(loadValue(_invert, &p_turn, index), index, false);
+            bool nowTurn=_startTurn;
+            if (!_dontLoadTurn) nowTurn=loadValue(_startTurn, &p_turn, index);
+            _turn.setBit(!nowTurn,index); // что-бы точно переключилось - поменяем состояние на противоположное
+            turn(nowTurn, index, false);
         }
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         switch (param->id) { // для скорости отправим текущие значения из локальнх переменных
             case 0: return getValueBool(arrayIndex);
             case 1: return _pin[arrayIndex];
@@ -97,11 +117,13 @@ public:
             case 4: return _alwaysoff;
             case 5: return _pull;
             case 6: return _checkbox;
+            case 16: return _startTurn;
+            case 17: return _dontLoadTurn;
         }
         return MWOSModule::getValue(param, arrayIndex); // отправим значение из EEPROM
     }
 
-    virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex) {
         MW_LOG_MODULE(this,arrayIndex); MW_LOG(F("setValue: ")); MW_LOG_LN((int32_t) v);
         if (param==&p_turn) { // команда установки ключа
             turn(v,arrayIndex, true);
@@ -112,6 +134,7 @@ public:
     }
 
     void initKey(int16_t index) {
+        if (_pin[index]<0) return;
         mwos.pin(_pin[index])->mode(true, _pull);
         MW_LOG_MODULE(this,index); MW_LOG(F("init key ")); MW_LOG(_pin[index]); MW_LOG('='); MW_LOG_LN(_pull);
     }
@@ -129,7 +152,7 @@ public:
      * Изменить значение ключа. (В отличие от turnBool не кеширует значение)
      * @param mode 0-выключить,1-включить,2-переключить, 3-255-оставить как есть
      */
-    virtual void turn(uint8_t mode, int16_t index=0, bool saveToStorage=true) {
+    virtual void turn(uint8_t mode, int16_t index, bool saveToStorage) {
         MW_LOG_MODULE(this,index); MW_LOG(F("turn ")); MW_LOG_LN(mode);
         uint8_t v=_turn.getBit(index);
         uint8_t old_v=v;
@@ -151,13 +174,14 @@ public:
                         turnBool(false,i); // отключим ключ
                 }
             }
+            old_v=v; // состояние ключа без инверсии
             if (_invert) {
                 if (v==1) v=0;
                 else v=1;
             }
             if (_reinit) initKey(index);
             if (_pin[index]>=0) mwos.pin(_pin[index])->writeDigital(v);
-            if (saveToStorage) saveValue(old_v, &p_turn, index);
+            if (saveToStorage && !_dontLoadTurn) saveValue(old_v, &p_turn, index); // сохраним состояние ключа без инверсии, если надо
         }
 
     }

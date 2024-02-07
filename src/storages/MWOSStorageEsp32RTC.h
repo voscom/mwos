@@ -7,6 +7,8 @@
 
 RTC_NOINIT_ATTR uint8_t MWOSStorageEsp32RTC_Buff[MWOSStorageEsp32RTC_SIZE]; // статический блок памяти в ESP32 RTC Slow memory
 
+const char MWOSStorageEsp32RTC_Name[] PROGMEM = {"ESP32_RTC_SLOW"};
+
 /***
  *
  * Бинарное хранилище в ESP32 RTC Slow memory
@@ -18,6 +20,7 @@ class MWOSStorageEsp32RTC : public MWOSStorage {
 public:
 
     MWOSStorageEsp32RTC() : MWOSStorage() {
+        setName((char *) &MWOSStorageEsp32RTC_Name);
         MW_LOG(F("Storage ESP32 RTC Slow RAM size: ")); MW_LOG_LN(sizeof(MWOSStorageEsp32RTC_Buff));
     }
 

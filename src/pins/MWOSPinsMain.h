@@ -39,19 +39,28 @@ public:
      * @param   pull тип подтяжки порта (0-нет, 1-на 0, 2-на питание, 3 - на выход открытый коллектор, на вход - аналоговый)
      */
     virtual bool mode(bool outPort, uint8_t pull) {
-        MW_LOG(F("mode: ")); MW_LOG(pin); MW_LOG('='); MW_LOG(outPort); MW_LOG(';'); MW_LOG_LN(outPort);
+#ifdef ESP32
+        if (pin>=NUM_DIGITAL_PINS && pin!=LED_BUILTIN) return false;
+#endif
+        MW_LOG(F("mode: ")); MW_LOG(pin); MW_LOG('='); MW_LOG(outPort); MW_LOG(';'); MW_LOG_LN(pull);
         if (outPort) { // на выход
             if (pull==mwos_pins_open_drain) {
 #ifndef __AVR
                 pinMode(pin, OUTPUT_OPEN_DRAIN); // открытый коллектор
+#else
+                pinMode(pin,OUTPUT);
 #endif
             } else if (pull==mwos_pins_pull_down) {
 #ifdef ESP32
                 pinMode(pin, PULLDOWN); // включим подтяжку
+#else
+                pinMode(pin,OUTPUT);
 #endif
             } else if (pull==mwos_pins_pull_up) {
 #ifdef ESP32
                 pinMode(pin, PULLUP); // включим подтяжку
+#else
+                pinMode(pin,OUTPUT);
 #endif
             } else {
                 pinMode(pin,OUTPUT);

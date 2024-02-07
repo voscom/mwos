@@ -34,9 +34,9 @@ public:
 #pragma pack(pop)
 
     // описание параметров
-    MWOS_PARAM(0, time, mwos_param_uint64, mwos_param_sensor, mwos_param_storage_no, 1);
-    MWOS_PARAM(1, uptime, mwos_param_uint32, mwos_param_sensor, mwos_param_storage_no, 1);
-    MWOS_PARAM(2, restarts, mwos_param_uint16, mwos_param_sensor, mwos_param_storage_rtc, 1);
+    MWOS_PARAM(0, time, mwos_param_uint64, mwos_param_realtime+mwos_param_option, mwos_param_storage_no, 1);
+    MWOS_PARAM(1, uptime, mwos_param_uint32, mwos_param_realtime+mwos_param_option, mwos_param_storage_no, 1);
+    MWOS_PARAM(2, restarts, mwos_param_uint16, mwos_param_option, mwos_param_storage_rtc, 1);
 
     MWOSTime() : MWOSModule((char *) F("time")) {
         moduleType=ModuleType::MODULE_TIME;
@@ -68,7 +68,7 @@ public:
         }
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         switch (param->id) { // для скорости отправим текущие значения из локальнх переменных
             case 0: return getTime();
             case 1: return getUptime();
@@ -76,7 +76,7 @@ public:
         return MWOSModule::getValue(param,arrayIndex);
     }
 
-    virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex) {
         if (param==&p_time) { // команда установки времени
             setTime(value);
         }
@@ -103,6 +103,10 @@ public:
         MW_LOG_MODULE(this); MW_LOG(F("setTime: ")); MW_LOG_LN((uint32_t) unixTime);
         _now=unixTime-(_uptime/1000UL); // время на момент старта контроллера
         SetParamChanged(&p_time, 0, true);
+    }
+
+    bool IsTimeSetting() {
+        return _now>0;
     }
 
     /**

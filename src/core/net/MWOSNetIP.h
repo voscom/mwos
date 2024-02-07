@@ -8,7 +8,7 @@ const char server_url2[] PROGMEM = "voscom.ru";
 const char server_url3[] PROGMEM = "voscom.ddns.net";
 
 #ifndef MWOS_SERVER_PORT
-#define MWOS_SERVER_PORT 8081
+#define MWOS_SERVER_PORT 8082
 #endif
 
 #ifndef MWOS_SERVER_HOST
@@ -57,7 +57,7 @@ public:
     virtual void onInit() {
         MWOSNetDevice::onInit();
         reconnectCount=loadValue(2,&p_reconnectCount,0);
-        if (reconnectCount==0 || reconnectCount>200) reconnectCount=2;
+        if (reconnectCount==0 || reconnectCount>200) reconnectCount=3;
         ip4=loadValue(0xffffffff,&p_ip4,0);
         ipPort=loadValue(MWOS_SERVER_PORT,&p_ipPort,0);
         if (ipPort<80 || ipPort==0xffff) ipPort=MWOS_SERVER_PORT;
@@ -71,7 +71,11 @@ public:
 
     virtual void connectToServer() { // начать подключение к серверу
         reconnectStep++;
+#ifndef MWOS_NOT_RECONNECT_URLS
         if (reconnectStep>reconnectCount+3) reconnectStep=0;
+#else
+        if (reconnectStep>reconnectCount) reconnectStep=0;
+#endif
         if (reconnectStep<reconnectCount) {
             if (ipPort==0 || ipPort==0xffffffff) {
                 connectAsync(IPAddress(ip4)); // подключимся к сокет-серверу из параметра
@@ -79,23 +83,30 @@ public:
                 connectAsync(MWOS_SERVER_HOST); // подключимся к сокет-серверу по умолчанию
             }
         } else {
-            /*
-            if (reconnectStep==reconnectCount) {
+#ifndef MWOS_NOT_RECONNECT_URLS
+            if (reconnectStep==reconnectCount+1) {
                 char server_url[strlen_P(server_url1) + 1];
                 strcpy_P(server_url, server_url1);
                 connectAsync(server_url); // подключимся к сокет-серверу voscom.online
-            }
-            if (reconnectStep==reconnectCount+1) {
+            } else
+            if (reconnectStep==reconnectCount+2) {
                 char server_url[strlen_P(server_url2) + 1];
                 strcpy_P(server_url, server_url2);
                 connectAsync(server_url); // подключимся к сокет-серверу
-            }
-            if (reconnectStep==reconnectCount+2) {
+            } else
+            if (reconnectStep==reconnectCount+3) {
                 char server_url[strlen_P(server_url3) + 1];
                 strcpy_P(server_url, server_url3);
                 connectAsync(server_url); // подключимся к сокет-серверу
-            } */
+            } else
+#endif
+            {
+                char server_url[strlen_P(server_url1) + 1];
+                strcpy_P(server_url, server_url1);
+                connectAsync(MWOS_SERVER_HOST); // подключимся к сокет-серверу по умолчанию
+            }
         }
+
         connect_timeout.start(50); // следующая попытка только через 5 сек
         MWOSNetDevice::connectToServer();
     }
@@ -117,11 +128,11 @@ public:
     }
 
     virtual void onDisconnect() {
-        if (_stream!=NULL) {
-            if (((Client *) _stream)->connected()) ((Client *) _stream)->stop(); // разорвем соединение, чтобы начать его заново
+        if (_stream!=NULL) { // разорвем соединение, чтобы начать его заново
+            ((Client *)_stream)->stop();
             //delete _stream;
-            _stream=NULL;
-            MW_LOG_MODULE(this); MW_LOG(F("disconnect step:"));  MW_LOG(reconnectStep); MW_LOG(F(", mem:")); MW_LOG_LN(getFreeMemory());
+            //_stream=NULL;
+            MW_LOG_MODULE(this); MW_LOG(F("disconnect step:"));  MW_LOG(reconnectStep); MW_DEBUG_LOG_MEM(false);
         }
         MWOSNetDevice::onDisconnect();
     }

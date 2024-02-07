@@ -1,6 +1,8 @@
 #ifndef MWOS3_MWOSSTORAGEESP8266RTC_H
 #define MWOS3_MWOSSTORAGEESP8266RTC_H
 
+const char MWOSStorageEsp8266RTC_Name[] PROGMEM = {"ESP8266_RTC"};
+
 /***
  *
  * Бинарное хранилище в ESP8266 RTC
@@ -9,9 +11,13 @@
  * сбрасывается только при выключении питания, если нет резервной батареи
  *
  */
-
 class MWOSStorageEsp8266RTC : public MWOSStorage {
 public:
+    MWOSStorageEsp8266RTC() : MWOSStorage() {
+        setName((char *) &MWOSStorageEsp8266RTC_Name);
+        MW_LOG_LN(F("Storage ESP32 RTC Slow RAM"));
+    }
+
 #ifdef ESP8266
 
     virtual uint8_t read(size_t byteOffset) {

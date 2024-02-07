@@ -42,6 +42,10 @@
 #define MWOS_USER_HASH 0
 #endif
 
+#ifndef MWOS_CRYPT_TYPE
+#define MWOS_CRYPT_TYPE 0
+#endif
+
 extern MWOS3 mwos;
 
 class MWOSNetTransmitter : Print {
@@ -49,8 +53,11 @@ public:
 
 #pragma pack(push,1)
     // для отправки данных
-    bool needSendFormat=false;
-    bool IsConnected=false; // подключено к сереру
+    uint8_t needSendFormat:1; // необходимо отправить формат контроллера
+    uint8_t IsConnected:1; // подключено к сереру
+    uint8_t needCrypt:1; // необходимо шифровать данные
+    uint8_t finishFormat:1; // необходимо отправить окончание формата
+    uint8_t reserve0:4;
     MWOSModuleBase * sendModule=NULL;
     MWOSParam * sendParam=NULL;
     MWOS_PARAM_INDEX_UINT sendParamIndex=0;
@@ -61,6 +68,11 @@ public:
 #endif
     MW_CRC16 send_crc16;
     Stream * _stream;
+#if (MWOS_CRYPT_TYPE==1)
+    uint8_t maskKey[4];
+    uint8_t stepCrypt; // текущий шаг шифрования
+    uint8_t stepDecrypt; // текущий шаг дешифрования
+#endif
 #pragma pack(pop)
 
     void sendUpdate() {
@@ -69,6 +81,7 @@ public:
             while (writeOffset != sendOffset) {
                 int16_t sizeSend=writeOffset-sendOffset;
                 if (sizeSend<0) sizeSend=MWOS_SEND_BUFFER_SIZE-sendOffset;
+                MW_LOG(F("write block: ")); MW_LOG_LN(sizeSend);
                 if (_stream->write(&sendBuffer[sendOffset],sizeSend)==0) {
                     MW_LOG(F("write block error: ")); MW_LOG_LN(sizeSend);
                     return; // никак не отправляется
@@ -83,31 +96,6 @@ public:
 #endif
         if (needSendFormat) writeFormatController();
         else if (IsConnected) writeChangedModules();
-    }
-
-    /***
-     * Отправить на сервер хендшейк (не проверяет переполнение буффера, потому что отправляется в начале сессии)
-     * @return  Размер имени проекта + 40 байт
-     */
-    uint16_t writeHandshake(uint32_t cid) {
-        if (this->availableForWrite()<44) {
-            //write(0);
-            return 0;
-        }
-        uint16_t size=sendBeginBlockParam(mwos_server_cmd_handshake); // 5
-        size+=writeUInt32(cid); // 7 код контроллера
-        size+=writeUInt64(MWOS_USER_HASH); // 15 отправим MW_User_Hash
-        size+=writeUInt32(getChipID()); // 19 отправим chipID
-        size+=write_progmem_str((char *) mwos_project); // имя проекта
-        size+=write(0); // 20 конец строки
-        size+=write_progmem_str((char *) git_hash_proj,8); // 28 версия проекта
-        size+=write('_'); // 29
-        size+=write_progmem_str((char *) git_hash_mwos,8); // 37 версия mwos
-        size+=write(0); // 39 конец строки
-        size+=write(mwos.storagesMask); // 41 состояния хранилищ
-        size+=sendEndBlock();
-        MW_LOG(F("writeHandshake: ")); MW_LOG(cid); MW_LOG(':'); MW_LOG_LN(size);
-        return size;
     }
 
     uint16_t writeUInt32(uint32_t v) {
@@ -134,10 +122,11 @@ public:
      * Команда, начинающая отправку формата контроллера на сервер
      */
     void sendFormatController() {
-        MW_LOG(F("sendFormatController: ")); MW_LOG_LN(this->availableForWrite());
         sendModule=NULL;
         sendParam=NULL;
         needSendFormat=true;
+        finishFormat=false;
+        MW_LOG(F("sendFormatController start: ")); MW_LOG_LN(this->availableForWrite());
     }
 
     /***
@@ -145,73 +134,39 @@ public:
      * следит за переполнением буффера отправки и отправляет продолжение, когда место появится
      */
     void writeFormatController() {
-        if (sendModule==NULL && sendParam==NULL) {
-            int16_t controllerInfoSize= mwos.nameSize()+158;
-            if (availableForWrite()<=controllerInfoSize) { // нет места для отправки начала блока и описания контроллера
-                return;
-            }
-            sendBeginBlockParam(mwos_server_cmd_get_format); // 8 признак, что дальше идет формат контроллера
-            writeUInt16(mwos.modulesCount); // 10 количество модулей
-            write(mwos.storageCount); // 10 количество хранилищ
-            write(MWOS_CONTROLLER_TYPE); // 11 тип контроллера
-            write(getPlatform()); // 12 тип платформы микроконтроллера
-            writeUInt16((uint16_t) MWOS_SEND_BUFFER_SIZE); // 14 максимальный размер буффера отправки
-            writeUInt16((uint16_t) MWOS_RECIVE_TIMEOUT_DSEC); // 16 таймаут приема
-            write_progmem_str((char *) git_hash_proj); // +40 = 56 GIT хеш проекта (до 40 символов)
-            write(0); // 57 конец строки
-            write_progmem_str((char *) git_hash_mwos); // +40 = 96 GIT хеш mwos (до 40 символов)
-            write(0); // 97 конец строки
-            mwos.printName(this); // описание контроллера
-            write(0); // 98 конец строки
-            write_progmem_str((char *) mwos_board,40); // 99 BOARD (до 40 байт)
-            write(0); // 141 конец строки
-            uint64_t timeStampBuild=BUILD_TIME_PROJ;
-            write((uint8_t *) &timeStampBuild,8); // еще 8 байт - время компиляции
-            sendModule=(MWOSModuleBase *) mwos.child;
+        if (!finishFormat && sendModule==NULL && sendParam==NULL) {
+            // отправим данные хранилищ
+            if (frameStoragesInf()==0) return; // не отправлено
             sendParamIndex=0;
-        }
-        while (sendModule!=NULL) {
-            if (sendParam==NULL) { // сначала отправим данные модуля
-                // {имя} + {uint8 #0} + {uint16 id} + {uint16 count}
-                int16_t moduleFormatSize= sendModule->nameSize()+6;
-                if (availableForWrite()<=moduleFormatSize) { // нет места для отправки модуля
-                    return;
-                }
-                sendModule->printName(this); // имя
-                write(0); // 1 конец строки
-                writeUInt16(sendModule->id); // 3 id модуля
-                write(sendModule->moduleType); // 4 тип модуля
-                writeUInt16(sendModule->paramsCount); //  6 количество параметров
-                sendParam=(MWOSParam *) sendModule->child;
-            }
-            // отправим данные параметров
-            while (sendParam!=NULL) {
-                int16_t paramFormatSize=sendParam->nameSize()+10;
-                if (availableForWrite()<=paramFormatSize) { // нет места для отправки параметра
-                    return;
-                }
-                writeUInt16(sendParam->id); // 2 id параметра (может и не соответствовать порядковому номеру)
-                write(sendParam->valueType); // 6 тип значения параметра
-                writeUInt16(sendParam->arrayLength); // 7 размер массива параметра
-                write(sendParam->group); // 7 группа параметра
-                write((uint8_t) sendParam->storage); // 9 место хранения
-                sendParam->printName(this); // имя
-                write(0); // 10 конец строки
-                //MW_LOG(F("SendParamFormat: ")); MW_LOG(sendModule->id); MW_LOG(':'); MW_LOG_LN(sendParam->id);
-                sendParam=(MWOSParam *) sendParam->next;
-                if (sendParam!=NULL && sendParam->unitType!=UnitType::PARAM) sendParam=NULL;
-
-            }
-            sendParam=NULL;
-            sendModule=(MWOSModuleBase *) sendModule->next;
-            if (sendModule!=NULL && sendModule->unitType!=UnitType::MODULE) sendModule=NULL;
-        }
-        if (availableForWrite()<=6) { // нет места для отправки концевика блока
+            sendModule=(MWOSModuleBase *) mwos.child; // начнем отправку описания первого модуля
             return;
         }
-        sendEndBlock();
-        ToSendModule(mwos.child);
+        if (sendModule!=NULL) {
+            if (sendParam==NULL) { // сначала отправим формат модуля
+                if (frameModuleInf(sendModule)==0) return; // не отправлено
+                sendParam=(MWOSParam *) sendModule->child;
+                return;
+            } else { // отправим формат параметров
+                if (frameModuleParamInf(sendModule,sendParam)==0) return; // не отправлено
+                sendParam=(MWOSParam *) sendParam->next;
+                if (sendParam!=NULL && sendParam->unitType!=UnitType::PARAM) sendParam = NULL;
+                if (sendParam==NULL) {
+                    sendModule=(MWOSModuleBase *) sendModule->next;
+                    if (sendModule!=NULL && sendModule->unitType!=UnitType::MODULE) {
+                        sendModule=NULL;
+                        finishFormat=true;
+                    }
+                }
+                return;
+            }
+        }
+        if (finishFormat) { // отправим основные данные о прошивке контроллера
+            if (frameFirmwareInf() == 0) return; // не отправлено
+            finishFormat=false;
+        }
+        ToModule(mwos.child);
         needSendFormat=false;
+        MW_LOG_LN(F("sendFormatController stop!"));
     }
 
     /**
@@ -219,74 +174,89 @@ public:
      * следит за переполнением буффера отправки и отправляет продолжение, когда место появится
      */
     void writeChangedModules() {
-        while (sendModule!=NULL) {
+        if (sendModule!=NULL) {
             if (sendModule->changedMask.haveSetBits()) { // только, если есть установленные биты изменения параметров для модуля
-                while (sendParam!=NULL) {
-                    while (sendParamIndex < sendParam->arrayCount()) {
-                        if (sendModule->IsParamChanged(sendParam, sendParamIndex) && !sendParam->IsGroup(mwos_param_secret)) {
-                            if ((int16_t) sendParam->byteSize(false) + 14 < availableForWrite()) {
-                                // отправим значение
-                                MW_LOG(F("sendValues: ")); MW_LOG(sendModule->id); MW_LOG(':'); MW_LOG(sendParam->id); MW_LOG(':'); MW_LOG_LN(sendParamIndex);
-                                sendBeginBlockParam(mwos_server_cmd_param_set_value,sendModule->id,sendParam->id,sendParamIndex); // 11
-                                uint16_t byteSize=sendParam->byteSize(false);
-                                int64_t value= sendModule->getValue(sendParam, sendParamIndex);
-                                uint8_t * block=(uint8_t *) &value;
-                                for (uint16_t i = 0; i < byteSize; ++i) {
-                                    write(block[i]);
+                if (sendParam!=NULL) {
+                    if (!sendParam->IsGroup(mwos_param_secret)) {
+                        if (sendParamIndex==0 && sendModule->IsParamAllChanged(sendParam)) { // отправим все значения
+                            if (frameModuleParamAllValues(sendModule, sendParam) < 1) return; // нет места для отправки блока
+                            MW_LOG(F("sendAllValues: ")); MW_LOG(sendModule->id); MW_LOG(':'); MW_LOG_LN(sendParam->id);
+                            sendModule->SetParamChanged(sendParam, UINT16_MAX, false); // сбросим биты отправки
+                        } else {
+                            if (sendParamIndex < sendParam->arrayCount()) {
+                                if (sendModule->IsParamChanged(sendParam, sendParamIndex)) {
+                                    if (frameModuleParamValue(sendModule, sendParam, sendParamIndex) <1) return; // нет места для отправки блока
+                                    MW_LOG(F("sendValues: ")); MW_LOG(sendModule->id); MW_LOG(':'); MW_LOG(sendParam->id); MW_LOG(':'); MW_LOG_LN(sendParamIndex);
+                                    sendModule->SetParamChanged(sendParam, sendParamIndex, false); // сбросим бит отправки
                                 }
-                                sendEndBlock(); // 14
-                            } else return; // нет места для отправки блока
+                                sendParamIndex++;
+                                return;
+                            }
                         }
-                        sendModule->SetParamChanged(sendParam, sendParamIndex, false); // сбросим бит отправки
-                        sendParamIndex++;
                     }
-                    ToSendParam(sendParam->next); // следующий параметр
+                    ToParam(sendParam->next); // следующий параметр
+                    return;
                 }
             }
-            ToSendModule(sendModule->next); // следующий модуль
+            ToModule(sendModule->next); // следующий модуль
+            return;
         }
-        ToSendModule(mwos.child); // к первому модулю
+        ToModule(mwos.child); // к первому модулю
     }
 
-    void ToSendModule(MWOSUnit * toUnit) {
+    void ToModule(MWOSUnit * toUnit) {
         sendModule=(MWOSModuleBase *) toUnit;
         if (sendModule!=NULL && sendModule->unitType!=UnitType::MODULE) sendModule=NULL;
-        if (sendModule!=NULL) ToSendParam(sendModule->child);
-        else ToSendParam(NULL);
+        if (sendModule!=NULL) ToParam(sendModule->child);
+        else ToParam(NULL);
     }
 
-    void ToSendParam(MWOSUnit * toUnit) {
+    void ToParam(MWOSUnit * toUnit) {
         sendParam=(MWOSParam *) toUnit;
         if (sendParam!=NULL && sendParam->unitType!=UnitType::PARAM) sendParam=NULL;
         sendParamIndex=0;
     }
 
 
-    /***
-     * Отправить признак начала блока с id-модуля и id-параметра (8 байт)
-     * @param moduleId
-     * @param paramId
-     * @return
-     */
-    uint16_t sendBeginBlockParam(MWOSProtocolCommand cmd, uint16_t moduleId=0, uint16_t paramId=0, uint16_t arrayIndex=0) {
-        write(02); // 1 признак начала пакета
-        writePacketSign(); // 4 подпись пакета
-        send_crc16.start();
-        write(cmd); // 5
-        if (cmd>127) return 5;
-        writeUInt16(moduleId); // 7
-        if (cmd>63) return 7;
-        writeUInt16(paramId); // 9
-        if (cmd>31) return 9;
-        writeUInt16(arrayIndex); // 11
-        return 11;
+    uint16_t beginFrame(MWOSProtocolCommand cmd, uint16_t moduleId=0, uint16_t paramId=0, uint16_t arrayIndex=0) {
+#if (MWOS_CRYPT_TYPE==1)
+        if (maskKey[0]!=0) {
+            needCrypt= true; // начнем шифрование, если задана маска с ключом шифрования
+            stepCrypt=0;
+        }
+#endif
+        write(cmd);
+        if (cmd>127) return 1;
+        writeUInt16(moduleId);
+        if (cmd>63) return 3;
+        writeUInt16(paramId);
+        if (cmd>31) return 5;
+        writeUInt16(arrayIndex);
+        return 7;
     }
 
     /***
-     * Отправить концевик блока с контрольной суммой (6 байт)
-     * @return
+     * Отправить признак начала пакета для сервера
+     * @return Размер отправленного
      */
-    uint16_t sendEndBlock() {
+    uint16_t beginPacket() {
+#if (MWOS_CRYPT_TYPE==1)
+        needCrypt= false; // подпись начала пакета не шифруем
+        stepCrypt=0;
+#endif
+        write(02); // 1 признак начала пакета
+        writePacketSign(); // 4 подпись пакета
+        send_crc16.start();
+        return 4;
+    }
+
+
+    /***
+     * Отправить признак окончания пакета для сервера
+     * @return Размер отправленного
+     */
+    uint16_t endPacket() {
+        needCrypt= false; // подпись конца пакета и контрольную сумму не шифруем
         write(03); // 1 признак конца пакета
         writePacketSign(); // 4 подпись пакета
         // отправим контрольную сумму
@@ -325,6 +295,12 @@ public:
     }
 
     virtual size_t write(uint8_t byte) {
+#if (MWOS_CRYPT_TYPE==1)
+        if (needCrypt) {
+            byte^=maskKey[stepCrypt++];
+            stepCrypt &=3;
+        }
+#endif
         send_crc16.add(byte);
 #ifdef MWOS_SEND_BUFFER_USE
         sendBuffer[writeOffset]=byte;
@@ -368,6 +344,301 @@ public:
             char ch = pgm_read_byte_near(progmem_str + i);
             write(ch);
         }
+        return size;
+    }
+
+/*************** ОТПРАВКА ФРЕЙМОВ ********************/
+
+    /***
+     * Отправить на сервер фрейм Дополнительные данные в формате JSON
+     * @return  Размер отправленного
+     * @return
+     */
+    size_t frameJSON(char * jsonInFlash) {
+        int frameSize=strlen_P(jsonInFlash)+12;
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameJSON error: ")); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        int size=beginPacket();
+        // 0: Код фрейма: Дополнительные данные в формате JSON
+        size+=beginFrame(mwos_server_cmd_frame_json);
+        // 1: Дополнительные данные в формате JSON
+        size+=write_progmem_str(jsonInFlash);
+        size+=write(0); // 2 конец строки
+        size+=endPacket();
+        MW_LOG(F("frameJSON: ")); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(size);
+        return size;
+    }
+
+    /***
+     * Отправить на сервер фрейм хендшейка
+     * @return  Размер отправленного
+     */
+    size_t frameHandshake(uint32_t cid) {
+        int frameSize=strlen_P((char *) mwos_project);
+        frameSize+=40;
+#if (MWOS_CRYPT_TYPE==1)
+        frameSize+=4; // учтем размер ключа
+        maskKey[0]=0; // что-бы не шифровало начало фрейма
+#endif
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameHandshake error: ")); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        int size=beginPacket();
+        // 0: Код фрейма: HANDSHAKE от клиента серверу
+        size+=beginFrame(mwos_server_cmd_handshake);
+        // 1: генерируемый ключ для шифра сессии (далее - все шифруется)
+        size+=write(MWOS_CRYPT_TYPE); // тип шифрования
+#if (MWOS_CRYPT_TYPE==1)
+        MW_LOG(F("session maskKey: "));
+        for(uint8_t x = 0; x < sizeof(maskKey); x++) {
+            maskKey[x] = random(1,0xFF);
+            size+=write(maskKey[x]); // отправим байт ключа сессии без учета секретного ключа
+            MW_LOG('-'); MW_LOG(maskKey[x]);
+        }
+        MW_LOG_LN();
+        stepCrypt=0;
+        needCrypt= true; // начнем шифрование
+#endif
+        // 6: 64-бит хеш пользователя с сайта MWOS
+        size+=writeUInt64(MWOS_USER_HASH);
+        // 14: Глобальный ID контроллера CID (если 0 - используется LID)
+        size+=writeUInt32(cid);
+        // 18: Локальный ID контроллера (LID) у пользователя (или chipID, если LID=0)
+        uint32_t localID=MWOS_CONTROLLER_ID;  // локальный ID контроллера у пользователя
+        if (localID==0) localID=getChipID(); // если LID=0, то chipID
+        size+=writeUInt32(localID);
+        // 22: Тип контроллера
+        size+=write(MWOS_CONTROLLER_TYPE);
+        // 23: Количество модулей контроллера
+        size+=writeUInt16(mwos.modulesCount);
+        // 25: Время компиляции прошивки (UNIXTIME)
+        uint64_t timeStampBuild=BUILD_TIME_PROJ;
+        size+=write((uint8_t *) &timeStampBuild,8); // еще 8 байт - время компиляции
+        // 33: Название проекта
+        size+=write_progmem_str((char *) mwos_project); // имя проекта
+        size+=write(0); // 34 конец строки
+        size+=endPacket();
+#if (MWOS_CRYPT_TYPE==1)
+        MW_LOG(F("real maskKey: "));
+        uint8_t * mwos_secret_key_link= (uint8_t *) mwos_secret_key;
+        for(uint8_t i = 0; i < sizeof(maskKey); i++) {
+            maskKey[i] ^= pgm_read_byte_near(mwos_secret_key_link + i); // учтем секретный ключ
+            MW_LOG('-'); MW_LOG(maskKey[i]);
+        }
+        MW_LOG_LN();
+#endif
+        MW_LOG(F("frameHandshake: ")); MW_LOG(cid); MW_LOG(':'); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN((int) size);
+        return size;
+    }
+
+protected:
+
+    /**
+     * Отправить на сервер фрейм данных о прошивке
+     * @return Размер отправленного
+     */
+    size_t frameFirmwareInf() {
+        int frameSize=strlen_P((char *) mwos_board);
+        frameSize+=mwos.nameSize();
+        frameSize+=strlen_P((char *) git_hash_proj);
+        frameSize+=strlen_P((char *) git_url_proj);
+        frameSize+=strlen_P((char *) git_hash_mwos);
+        frameSize+=strlen_P((char *) git_url_mwos);
+        frameSize+=17;
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameFirmwareInf error: ")); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        // 0: Код фрейма: Данные о прошивке
+        int size=beginPacket();
+        size+=beginFrame(mwos_server_cmd_frame_firmware);
+        // 1: Название контроллера (или JSON с информацией)
+        size+=mwos.printName(this);
+        size+=write(0); // конец строки
+        // 2: Имя платформы board из platformio.ini
+        size+=write_progmem_str((char *) mwos_board);
+        size+=write(0); // конец строки
+        // 3: GIT хеш проекта
+        size+=write_progmem_str((char *) git_hash_proj);
+        size+=write(0); // конец строки
+        // 4: GIT url проекта
+        size+=write_progmem_str((char *) git_url_proj);
+        size+=write(0); // конец строки
+        // 5: GIT хеш MWOS
+        size+=write_progmem_str((char *) git_hash_mwos);
+        size+=write(0); // конец строки
+        // 6: GIT url MWOS
+        size+=write_progmem_str((char *) git_url_mwos);
+        size+=write(0); // 97 конец строки
+        size+=endPacket();
+        MW_LOG(F("frameFirmwareInf: ")); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(size);
+        return size;
+    }
+
+    /**
+     * Отправить на сервер фрейм данных о хранилищах
+     * @return Размер отправленного
+     */
+    size_t frameStoragesInf() {
+        int frameSize=12;
+        for (uint8_t i = 0; i < mwos.storageCount; ++i) {
+            MWOSStorage * storage=mwos.storages[i];
+            frameSize+=storage->nameSize()+9;
+        }
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameStoragesInf error: ")); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        // 0: Код фрейма: Данные о хранилищах
+        int size=beginPacket();
+        size+=beginFrame(mwos_server_cmd_frame_storages);
+        // 1: количество хранилищ
+        size+=write(mwos.storageCount);
+        // далее - данные на каждое хранилище
+        for (uint8_t i = 0; i < mwos.storageCount; ++i) {
+            MWOSStorage * storage=mwos.storages[i];
+            // 0: размер хранилища
+            size+=writeUInt32(storage->_bitSize);
+            // 4: смещение хранилища
+            size+=writeUInt32(storage->_offset);
+            // 8: Имя хранилища или JSON с информацией
+            size+=storage->printName(this);
+            size+=write(0); // 9: конец строки
+        }
+        size+=endPacket();
+        MW_LOG(F("frameStoragesInf: ")); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(size);
+        return size;
+    }
+
+    /**
+     * Отправить на сервер фрейм формат модуля
+     * @return Размер отправленного
+     */
+    size_t frameModuleInf(MWOSModuleBase * module) {
+        int frameSize=20;
+        frameSize+=module->nameSize();
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameModuleInf error: ")); MW_LOG_PROGMEM(module->name); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        // 0: Код фрейма: Данные о модуле
+        int size=beginPacket();
+        size+=beginFrame(mwos_server_cmd_module_inf,module->id);
+        // 3: Количество параметров в модуле
+        size+=writeUInt16(module->paramsCount);
+        // 5: Тип модуля
+        size+=write(module->moduleType);
+        // 6: маска хранилищ, куда уже сохранены данные параметров модуля
+        uint8_t storagesInited=module->storage0Init;
+        if (module->storage1Init) storagesInited |=2;
+        if (module->storage2Init) storagesInited |=4;
+        if (module->storage3Init) storagesInited |=8;
+        size+=write(storagesInited);
+        // 7: Номер параметра с таким именем
+        size+=writeUInt16(mwos.getNumForName(module));
+        // 9: Имя модуля или JSON с информацией
+        size+=module->printName(this); // имя (или данные в формате json)
+        size+=write(0); // 8 конец строки
+        size+=endPacket();
+        MW_LOG(F("frameModuleInf ")); MW_LOG_PROGMEM(module->name); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(size);
+        return size;
+    }
+
+    /**
+     * Отправить на сервер фрейм формат параметра модуля
+     * @return Размер отправленного
+     */
+    size_t frameModuleParamInf(MWOSModuleBase * module, MWOSParam * param) {
+        int frameSize=21;
+        frameSize+=param->nameSize();
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameModuleParamInf error: ")); MW_LOG_PROGMEM(module->name); MW_LOG(':'); MW_LOG_PROGMEM(param->name); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        int size=beginPacket();
+        // 0: Код фрейма: Данные о параметре модуля
+        size+=beginFrame(mwos_server_cmd_param_inf,module->id,param->id);
+        // 5: Количество значений параметра (размер массива)
+        size+=writeUInt16(sendParam->arrayLength);
+        // 7: Тип значения ParamValueType
+        size+=write(sendParam->valueType);
+        // 8: Группа параметра  ParamGroup
+        size+=write(sendParam->group);
+        // 9: Где хранится (хранилище)
+        size+=write((uint8_t) sendParam->storage);
+        // 10: Имя параметра или JSON с информацией
+        size+=sendParam->printName(this); // имя (или данные в формате json)
+        size+=write(0); // 11 конец строки
+        size+=endPacket();
+        MW_LOG(F("frameModuleParamInf ")); MW_LOG_PROGMEM(module->name); MW_LOG(':'); MW_LOG_PROGMEM(param->name); MW_LOG('='); MW_LOG(module->id); MW_LOG(':'); MW_LOG(param->id); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(size);
+        return size;
+    }
+
+    /**
+     * Отправить на сервер фрейм Значение параметра
+     * @return Размер отправленного
+     */
+    size_t frameModuleParamValue(MWOSModuleBase * module, MWOSParam * param, uint16_t index) {
+        int frameSize=17;
+        uint16_t byteSize=param->byteSize(false);
+        frameSize+=byteSize;
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameModuleParamValue error: ")); MW_LOG_PROGMEM(module->name); MW_LOG(':'); MW_LOG_PROGMEM(param->name); MW_LOG(':'); MW_LOG(index); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        // 0: Код фрейма: Данные о параметре модуля
+        int size=beginPacket();
+        size+=beginFrame(mwos_server_cmd_param_set_value,module->id,param->id, index);
+        // 7:Значение параметра (длина данных значения зависит от типа параметра)
+        int64_t value= module->getValue(param, index);
+        uint8_t * block=(uint8_t *) &value;
+        for (uint16_t i = 0; i < byteSize; ++i) {
+            size+=write(block[i]);
+        }
+        size+=endPacket();
+        MW_LOG(F("frameModuleParamValue ")); MW_LOG_PROGMEM(module->name); MW_LOG(':'); MW_LOG_PROGMEM(param->name); MW_LOG(':'); MW_LOG(index); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(size);
+        return size;
+    }
+
+    /**
+     * Отправить на сервер фрейм Все значения параметра
+     * @return Размер отправленного
+     */
+    size_t frameModuleParamAllValues(MWOSModuleBase * module, MWOSParam * param) {
+        int frameSize=15;
+        uint16_t byteSize=param->byteSize(false);
+        frameSize+=byteSize*param->arrayCount();
+        if (availableForWrite()<frameSize) { // нет места для этого фрейма
+            MW_LOG(F("frameModuleParamAllValues error: ")); MW_LOG_PROGMEM(module->name); MW_LOG(':'); MW_LOG_PROGMEM(param->name); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(availableForWrite());
+            return 0;
+        }
+        // 0: Код фрейма: Данные о параметре модуля
+        int size=beginPacket();
+        size+=beginFrame(mwos_server_cmd_param_set_param_all_values,module->id,param->id);
+        // 5:Значение параметра (длина данных значения зависит от типа параметра)
+        if (param->IsLong()) {
+            PackValueArrayPrt v;
+            v.value= module->getValue(param, 0);
+            if (v.size>0 && v.addr>0) {
+                uint8_t * block=(uint8_t *) v.addr;
+                for (uint16_t i = 0; i < v.size; i++) {
+                    size+=write(block[i]);
+                }
+            }
+        } else {
+            for (int index = 0; index < param->arrayCount(); index++) {
+                int64_t value= module->getValue(param, index);
+                uint8_t * block=(uint8_t *) &value;
+                for (uint16_t i = 0; i < byteSize; i++) {
+                    size+=write(block[i]);
+                }
+            }
+        }
+        size+=endPacket();
+        MW_LOG(F("frameModuleParamAllValues ")); MW_LOG_PROGMEM(module->name); MW_LOG(':'); MW_LOG_PROGMEM(param->name); MW_LOG('='); MW_LOG(frameSize); MW_LOG('/'); MW_LOG_LN(size);
         return size;
     }
 

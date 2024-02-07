@@ -8,18 +8,18 @@ extern "C" {
 #include "Arduino.h"
 
 #include "Ethernet2.h"
-#include "AsyncEthernetClient.h"
+#include "AsyncEthernetClientESP32.h"
 #include "Dns.h"
 
-uint16_t AsyncEthernetClient::_srcport = 1024;
+uint16_t AsyncEthernetClientESP32::_srcport = 1024;
 
-AsyncEthernetClient::AsyncEthernetClient() : _sock(MAX_SOCK_NUM) {
+AsyncEthernetClientESP32::AsyncEthernetClientESP32() : _sock(MAX_SOCK_NUM) {
 }
 
-AsyncEthernetClient::AsyncEthernetClient(uint8_t sock) : _sock(sock) {
+AsyncEthernetClientESP32::AsyncEthernetClientESP32(uint8_t sock) : _sock(sock) {
 }
 
-int AsyncEthernetClient::connect(const char* host, uint16_t port) {
+int AsyncEthernetClientESP32::connect(const char* host, uint16_t port) {
     // Look up the host first
     int ret = 0;
     DNSClient dns;
@@ -34,7 +34,7 @@ int AsyncEthernetClient::connect(const char* host, uint16_t port) {
     }
 }
 
-int AsyncEthernetClient::connect(IPAddress ip, uint16_t port) {
+int AsyncEthernetClientESP32::connect(IPAddress ip, uint16_t port) {
     if (_sock != MAX_SOCK_NUM)
         return 0;
 
@@ -66,11 +66,11 @@ int AsyncEthernetClient::connect(IPAddress ip, uint16_t port) {
     return 1;
 }
 
-size_t AsyncEthernetClient::write(uint8_t b) {
+size_t AsyncEthernetClientESP32::write(uint8_t b) {
     return write(&b, 1);
 }
 
-size_t AsyncEthernetClient::write(const uint8_t *buf, size_t size) {
+size_t AsyncEthernetClientESP32::write(const uint8_t *buf, size_t size) {
     if (_sock == MAX_SOCK_NUM) {
         setWriteError();
         return 0;
@@ -82,13 +82,13 @@ size_t AsyncEthernetClient::write(const uint8_t *buf, size_t size) {
     return size;
 }
 
-int AsyncEthernetClient::available() {
+int AsyncEthernetClientESP32::available() {
     if (_sock != MAX_SOCK_NUM)
         return w5500.getRXReceivedSize(_sock);
     return 0;
 }
 
-int AsyncEthernetClient::read() {
+int AsyncEthernetClientESP32::read() {
     uint8_t b;
     if ( recv(_sock, &b, 1) > 0 )
     {
@@ -102,11 +102,11 @@ int AsyncEthernetClient::read() {
     }
 }
 
-int AsyncEthernetClient::read(uint8_t *buf, size_t size) {
+int AsyncEthernetClientESP32::read(uint8_t *buf, size_t size) {
     return recv(_sock, buf, size);
 }
 
-int AsyncEthernetClient::peek() {
+int AsyncEthernetClientESP32::peek() {
     uint8_t b;
     // Unlike recv, peek doesn't check to see if there's any data available, so we must
     if (!available())
@@ -115,11 +115,11 @@ int AsyncEthernetClient::peek() {
     return b;
 }
 
-void AsyncEthernetClient::flush() {
+void AsyncEthernetClientESP32::flush() {
     ::flush(_sock);
 }
 
-void AsyncEthernetClient::stop() {
+void AsyncEthernetClientESP32::stop() {
     if (_sock == MAX_SOCK_NUM)
         return;
 
@@ -128,7 +128,7 @@ void AsyncEthernetClient::stop() {
     unsigned long start = millis();
 
     // wait a second for the connection to close
-    while (status() != SnSR::CLOSED && millis() - start < 1000)
+    while (status() != SnSR::CLOSED && millis() - start < 80)
         delay(1);
 
     // if it hasn't closed, close it forcefully
@@ -139,20 +139,15 @@ void AsyncEthernetClient::stop() {
     _sock = MAX_SOCK_NUM;
 }
 
-uint8_t AsyncEthernetClient::connected() {
+uint8_t AsyncEthernetClientESP32::connected() {
     if (_sock == MAX_SOCK_NUM) return 0;
 
     uint8_t s = status();
     return !(s == SnSR::LISTEN || s == SnSR::CLOSED || s == SnSR::FIN_WAIT ||
-            s==21 ||
              (s == SnSR::CLOSE_WAIT && !available()));
 }
 
-int AsyncEthernetClient::availableForWrite() {
-    return w5500.getTXFreeSize(_sock);
-}
-
-uint8_t AsyncEthernetClient::status() {
+uint8_t AsyncEthernetClientESP32::status() {
     if (_sock == MAX_SOCK_NUM) return SnSR::CLOSED;
     return w5500.readSnSR(_sock);
 }
@@ -160,10 +155,10 @@ uint8_t AsyncEthernetClient::status() {
 // the next function allows us to use the client returned by
 // EthernetServer::available() as the condition in an if-statement.
 
-AsyncEthernetClient::operator bool() {
+AsyncEthernetClientESP32::operator bool() {
     return _sock != MAX_SOCK_NUM;
 }
 
-bool AsyncEthernetClient::operator==(const AsyncEthernetClient& rhs) {
+bool AsyncEthernetClientESP32::operator==(const AsyncEthernetClientESP32& rhs) {
     return _sock == rhs._sock && _sock != MAX_SOCK_NUM && rhs._sock != MAX_SOCK_NUM;
 }

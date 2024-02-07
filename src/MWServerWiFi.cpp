@@ -14,21 +14,21 @@ MWServerWiFi::MWServerWiFi() : WebServer(80) {
 }
 
 void MWServerWiFi::startServer() {
-	Serial.println(F("MWServerWiFi startServer..."));
+	//MW_LOG_LN((F("MWServerWiFi startServer..."));
 	on("/", std::bind(&MWServerWiFi::handleRoot, this));
 	on("/cnt", std::bind(&MWServerWiFi::handleController, this));
 	on("/wifi", std::bind(&MWServerWiFi::handleWifi, this, true));
 	on("/0wifi", std::bind(&MWServerWiFi::handleWifi, this, false));
 	on("/wifisave", std::bind(&MWServerWiFi::handleWifiSave, this));
 	begin();
-	Serial.println(F("MWServerWiFi startServer!"));
+	//MW_LOG_LN(F("MWServerWiFi startServer!"));
 }
 
 void MWServerWiFi::handleRoot() {
   //if (captivePortal()) { // If caprive portal redirect instead of displaying the page.
   //  return;
   //}
-	Serial.println(F("AP user: /"));
+	//MW_LOG_LN(F("AP user: /"));
 
   String page = FPSTR(MW_HTTP_HEAD);
   page.replace("{v}", "Options");
@@ -67,7 +67,7 @@ void MWServerWiFi::handleController() {
 }
 
 void MWServerWiFi::handleWifi(boolean scan) {
-	Serial.println(F("AP user: /wifi"));
+	    //MW_LOG_LN(F("AP user: /wifi"));
 	  String page = FPSTR(MW_HTTP_HEAD);
 	  page.replace("{v}", "Config ESP");
 	  page += FPSTR(MW_HTTP_SCRIPT);
@@ -168,7 +168,7 @@ void MWServerWiFi::handleWifi(boolean scan) {
 }
 
 void MWServerWiFi::handleWifiSave() {
-	Serial.println(F("AP user: /wifisave"));
+	//MW_LOG_LN(F("AP user: /wifisave"));
 	  //DEBUG_WM(F("WiFi save"));
 	_ssid = arg("s");
 	_pass = arg("p");

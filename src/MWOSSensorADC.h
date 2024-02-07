@@ -38,7 +38,7 @@ public:
         _pin[0]=pin;
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         if (param->id==1) return _pin[arrayIndex];
         return MWOSSensorAnalog<sensorsCount>::getValue(param, arrayIndex); // отправим значение из EEPROM
     }

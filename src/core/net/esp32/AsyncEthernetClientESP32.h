@@ -13,11 +13,11 @@
 #include "IPAddress.h"
 
 
-class AsyncEthernetClient : public Client {
+class AsyncEthernetClientESP32 : public Client {
 
     public:
-        AsyncEthernetClient();
-        AsyncEthernetClient(uint8_t sock);
+        AsyncEthernetClientESP32();
+        AsyncEthernetClientESP32(uint8_t sock);
 
         uint8_t status();
         virtual int connect(IPAddress ip, uint16_t port);
@@ -32,8 +32,8 @@ class AsyncEthernetClient : public Client {
         virtual void stop();
         virtual uint8_t connected();
         virtual operator bool();
-        virtual bool operator==(const AsyncEthernetClient&);
-        virtual bool operator!=(const AsyncEthernetClient& rhs) { return !this->operator==(rhs); };
+        virtual bool operator==(const AsyncEthernetClientESP32&);
+        virtual bool operator!=(const AsyncEthernetClientESP32& rhs) { return !this->operator==(rhs); };
 
         friend class EthernetServer;
 

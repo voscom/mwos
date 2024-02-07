@@ -56,7 +56,7 @@ public:
         }
         if (lastUnit!=NULL) {
             newUnit->next=this;
-            if (newUnit->id==0) newUnit->id=n; // автоматом расставим id, если они не были заданы при создании
+            if (newUnit->id==0 && newUnit->unitType!=PARAM) newUnit->id=n; // автоматом расставим id, если они не были заданы при создании
             lastUnit->next=newUnit;
             return true;
         }

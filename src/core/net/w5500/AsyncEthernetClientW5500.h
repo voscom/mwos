@@ -12,11 +12,11 @@
 #include "Client.h"
 #include "IPAddress.h"
 
-class AsyncEthernetClient : public Client {
+class AsyncEthernetClientW5500 : public Client {
 
     public:
-        AsyncEthernetClient();
-        AsyncEthernetClient(uint8_t sock);
+        AsyncEthernetClientW5500();
+        AsyncEthernetClientW5500(uint8_t sock);
 
         uint8_t status();
         virtual int connect(IPAddress ip, uint16_t port);
@@ -31,8 +31,8 @@ class AsyncEthernetClient : public Client {
         virtual void stop();
         virtual uint8_t connected();
         virtual operator bool();
-        virtual bool operator==(const AsyncEthernetClient&);
-        virtual bool operator!=(const AsyncEthernetClient& rhs) { return !this->operator==(rhs); };
+        virtual bool operator==(const AsyncEthernetClientW5500&);
+        virtual bool operator!=(const AsyncEthernetClientW5500& rhs) { return !this->operator==(rhs); };
 
         virtual int availableForWrite();
 

@@ -98,7 +98,12 @@ public:
         MWOSParam * paramNow=(MWOSParam *) child;
         while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
             if (paramNow==param) {
-                changedMask.setBit(changed,res+arrayIndex);
+                if (arrayIndex==UINT16_MAX) { // все параметры
+                    for (MWOS_PARAM_INDEX_UINT i = 0; i < paramNow->arrayCount(); i++) {
+                        changedMask.setBit(changed,res+i);
+                    }
+                } else
+                    changedMask.setBit(changed,res+arrayIndex);
                 return;
             }
             res+=paramNow->arrayCount();
@@ -109,6 +114,7 @@ public:
     /**
      * Необходима отправка значения этого параметра на сервер?
      * @param param_id id параметра
+     * @param arrayIndex Номер значения
      * @return  true - необходима отправка
      */
     bool IsParamChangedByParamId(uint16_t param_id, uint16_t arrayIndex) {
@@ -124,6 +130,12 @@ public:
         return false;
     }
 
+    /**
+     * Необходима отправка значения этого параметра на сервер?
+     * @param param параметр
+     * @param arrayIndex Номер значения
+     * @return  true - необходима отправка
+     */
     bool IsParamChanged(MWOSParam * param, uint16_t arrayIndex) {
         int32_t res=0;
         MWOSParam * paramNow=(MWOSParam *) child;
@@ -135,6 +147,45 @@ public:
             paramNow=(MWOSParam *) paramNow->next;
         }
         return false;
+    }
+
+    /**
+     * Необходима отправка всех значений этого параметра на сервер?
+     * @param param параметр
+     * @return  true - необходима отправка
+     */
+    bool IsParamAllChanged(MWOSParam * param) {
+        int32_t res=0;
+        MWOSParam * paramNow=(MWOSParam *) child;
+        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
+            if (paramNow==param) {
+                for (int i = 0; i < paramNow->arrayCount(); ++i) {
+                    if (!changedMask.getBit(res+i)) return false;
+                }
+                return true;
+            }
+            res+=paramNow->arrayCount();
+            paramNow=(MWOSParam *) paramNow->next;
+        }
+        return false;
+    }
+
+    /***
+     * Ищет параметр, где используется этот пин
+     * @param pinNum    номер пина
+     * @return  параметр или NULL
+     */
+    MWOSParam * FindByPin(MWOS_PIN_INT pinNum) {
+        MWOSParam * paramNow=(MWOSParam *) child;
+        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
+            if (paramNow->IsGroup(mwos_param_pin)) {
+                for (MWOS_PARAM_INDEX_UINT i = 0; i < paramNow->arrayCount(); i++) {
+                    if (getValue(paramNow,i)==pinNum) return paramNow;
+                }
+            }
+            paramNow=(MWOSParam *) paramNow->next;
+        }
+        return NULL;
     }
 
     /***
@@ -160,12 +211,10 @@ public:
         MWOSParam * param=(MWOSParam *) child;
         while (param!=NULL && param->unitType==UnitType::PARAM) {
             if (param->storage==storageType) {
-                if (param->IsBytes()) { // если это не битовый параметр - выравнивание по байту
-                    if ((bitSize & 7) > 0) {
-                        int32_t byteSize=bitSize >> 3;
-                        byteSize++;
-                        bitSize=byteSize << 3;
-                    }
+                if ((bitSize & 7) > 0 && param->IsBytes()) { // если это не битовый параметр - выравнивание по байту
+                    int32_t byteSize=bitSize >> 3;
+                    byteSize++;
+                    bitSize=byteSize << 3;
                 }
                 bitSize+=param->bitsSize(true);
             }
@@ -185,12 +234,10 @@ public:
         MWOSParam * paramNow=(MWOSParam *) child;
         while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
             if (paramNow->storage==storageType) {
-                if (paramNow->IsBytes()) { // если это не битовый параметр - выравнивание по байту
-                    if ((bitOffset & 7)>0) {
-                        int32_t byteOffset=bitOffset >> 3;
-                        byteOffset++;
-                        bitOffset=byteOffset << 3;
-                    }
+                if ((bitOffset & 7)>0 && paramNow->IsBytes()) { // если это не битовый параметр - выравнивание по байту
+                    int32_t byteOffset=bitOffset >> 3;
+                    byteOffset++;
+                    bitOffset=byteOffset << 3;
                 }
                 if (param==paramNow) return bitOffset;
                 bitOffset+=paramNow->bitsSize(true);
@@ -252,7 +299,7 @@ public:
      * @param arrayIndex Номер индекса в массиве значений параметра (если это массив)
      * @return  Значение
      */
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex=0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         return 0;
     }
 
@@ -262,8 +309,10 @@ public:
      * @param param     параметр
      * @param arrayIndex Номер индекса в массиве значений параметра (если это массив)
      */
-    virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex=0) {
+    virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex) {
     }
+
+
 
 
 };

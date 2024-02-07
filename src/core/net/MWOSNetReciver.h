@@ -49,7 +49,6 @@ public:
 
 #pragma pack(push,1)
     MWOSNetReciverFields recive_args;
-    MWOSProtocolCommand cmd; // полученная от сервера команда mwos_server_cmd_*
     uint8_t _cmdMode=0;
     uint16_t reciveBlockSize;
     MW_CRC16 recive_crc16;
@@ -67,6 +66,15 @@ public:
      * Если обнаружена подпись и считана длина, то _cmdMode == 5
      */
     virtual void readNexByte(uint8_t reciveByte) {
+        //MW_LOG('~'); MW_LOG(reciveByte,HEX);
+        uint8_t encryptByte=reciveByte;
+#if (MWOS_CRYPT_TYPE==1)
+        if (_cmdMode>3 && _cmdMode<14 && maskKey[0]!=0) { // дешифруем принятый байт
+            reciveByte^=maskKey[stepDecrypt++];
+            stepDecrypt &=3;
+        } else
+            stepDecrypt=0;
+#endif
         switch (_cmdMode) {
             case 0: // начало пакета
                 if (reciveByte==03) {
@@ -75,9 +83,8 @@ public:
                 }
                 return;
             case 1: // начало пакета
-                if (reciveByte=='M') {
-                    _cmdMode++;
-                }
+                if (reciveByte=='M') _cmdMode++;
+                else reciveClear(_cmdMode);
                 return;
             case 2: // начало пакета
                 if (reciveByte=='W') _cmdMode++;
@@ -89,9 +96,10 @@ public:
                 return;
             case 4: // команда от сервера
                 recive_crc16.start();
-                recive_crc16.add(reciveByte);
-                cmd=(MWOSProtocolCommand) reciveByte;
-                if (cmd>127) { // это команда контроллеру (без аргументов)
+                recive_crc16.add(encryptByte);
+                recive_args.cmd=(MWOSProtocolCommand) reciveByte;
+                //MW_LOG(F("Recive cmd ")); MW_LOG_LN(recive_args.cmd);
+                if (recive_args.cmd>127) { // это команда контроллеру (без аргументов)
                     _cmdMode=14; // сразу перейти к расчету контрольной суммы
                     return;
                 }
@@ -99,16 +107,16 @@ public:
                 return;
             case 5: // id модуля
                 recive_args.module_id=reciveByte;
-                recive_crc16.add(reciveByte);
+                recive_crc16.add(encryptByte);
                 _cmdMode++;
                 return;
             case 6: //  id модуля
                 recive_args.module_id |=reciveByte << 8;
-                //MW_LOG(F("Recive module id ")); MW_LOG_LN(reciveModule_id);
+                //MW_LOG(F("Recive module id ")); MW_LOG_LN(recive_args.module_id);
                 reciveModule=(MWOSModule *) mwos.getModule(recive_args.module_id);
                 if (reciveModule!=NULL) {
-                    recive_crc16.add(reciveByte);
-                    if (cmd>63) { // это команда модулю (без аргументов)
+                    recive_crc16.add(encryptByte);
+                    if (recive_args.cmd>63) { // это команда модулю (без аргументов)
                         _cmdMode=14; // сразу перейти к расчету контрольной суммы
                         return;
                     }
@@ -117,16 +125,16 @@ public:
                 return;
             case 7: // младший байт id параметра
                 recive_args.param_id=reciveByte;
-                recive_crc16.add(reciveByte);
+                recive_crc16.add(encryptByte);
                 _cmdMode++;
                 return;
             case 8: // старший байт id параметра
                 recive_args.param_id |=reciveByte << 8;
-                //MW_LOG(F("Recive param id ")); MW_LOG_LN(reciveParam_id);
+                //MW_LOG(F("Recive param id ")); MW_LOG_LN(recive_args.param_id);
                 reciveParam=reciveModule->getParam(recive_args.param_id);
                 if (reciveParam!=NULL) {
-                    recive_crc16.add(reciveByte);
-                    if (cmd>31) { // это команда параметру (без аргументов)
+                    recive_crc16.add(encryptByte);
+                    if (recive_args.cmd>31) { // это команда параметру (без аргументов)
                         _cmdMode=14; // сразу перейти к расчету контрольной суммы
                         return;
                     }
@@ -136,15 +144,15 @@ public:
                 return;
             case 9: // младший байт индекса массива
                 recive_args.array_index=reciveByte;
-                recive_crc16.add(reciveByte);
+                recive_crc16.add(encryptByte);
                 _cmdMode++;
                 return;
             case 10: // старший байт индекса массива
                 recive_args.array_index |=reciveByte << 8;
-                //MW_LOG(F("Recive index ")); MW_LOG_LN(recive_param_array_index);
+                //MW_LOG(F("Recive index ")); MW_LOG_LN(recive_args.array_index);
                 if ((MWOS_PARAM_INDEX_UINT) recive_args.array_index < reciveParam->arrayCount()) {
-                    recive_crc16.add(reciveByte);
-                    if (cmd>15) { // это команда параметру с индексом массива (без аргументов)
+                    recive_crc16.add(encryptByte);
+                    if (recive_args.cmd>15) { // это команда параметру с индексом массива (без аргументов)
                         _cmdMode=14; // сразу перейти к расчету контрольной суммы
                         return;
                     }
@@ -153,7 +161,7 @@ public:
                 return;
             case 11: // размер данных (младший байт)
                 reciveBlockSize=reciveByte;
-                recive_crc16.add(reciveByte);
+                recive_crc16.add(encryptByte);
                 _cmdMode++;
                 return;
             case 12: // размер данных (старший байт)
@@ -162,7 +170,8 @@ public:
                     reciveClear(_cmdMode);
                     return;
                 }
-                recive_crc16.add(reciveByte);
+                //MW_LOG(F("Recive size ")); MW_LOG_LN(reciveBlockSize);
+                recive_crc16.add(encryptByte);
                 _cmdMode++;
                 // начнем прием данных
                 //recive_param_size=module->getParam(reciveParam_id)->byteSize(false); // размер в байтах
@@ -180,7 +189,7 @@ public:
                 recive_args.offset=0; // начнем принимать блок сначала
                 return;
             case 13: // аргументы
-                recive_crc16.add(reciveByte);
+                recive_crc16.add(encryptByte);
                 if (recive_args.valueIsLong) {
                     // если лезет в параметр - запишем
                     //if (recive_offset<recive_param_size) mwos.saveValue(reciveByte,recive_param_storage,recive_param_bitOffset+(recive_offset<<3),8, false);
@@ -210,27 +219,26 @@ public:
             case 15: // контрольная сумма  (старший байт)
                 reciveBlockSize |=reciveByte << 8;
                 int8_t errorCode=0;
+#ifdef MWOS_DEBUG
+                MW_LOG(F("Recive "));
+                if (errorCode>0) {
+                    recive_args.print(&MWOS_DEBUG);
+                    MW_LOG(F(", error:")); MW_LOG_LN(errorCode);
+                } else
+                    recive_args.println(&MWOS_DEBUG);
+#endif
                 if (reciveBlockSize!=recive_crc16.crc) {
                     errorCode=_cmdMode;
                     MW_LOG(F("Recive CRC Error ")); MW_LOG(reciveBlockSize); MW_LOG('='); MW_LOG_LN(recive_crc16.crc);
-                    MW_LOG(F("Error command ")); MW_LOG(cmd); MW_LOG('>'); MW_LOG(recive_args.module_id);
-                    MW_LOG(':'); MW_LOG(recive_args.param_id);  MW_LOG(':'); MW_LOG(recive_args.array_index);
-                    MW_LOG('='); MW_LOG_LN((int32_t) recive_args.reciveValue);
                 } else {
-                    MW_LOG(F("Recive command ")); MW_LOG(cmd); MW_LOG('>'); MW_LOG(recive_args.module_id);
-                        MW_LOG(':'); MW_LOG(recive_args.param_id);  MW_LOG(':'); MW_LOG(recive_args.array_index);
-                        MW_LOG('='); MW_LOG_LN((int32_t) recive_args.reciveValue);
                     if (serverCommand()) { // это команда сервера
                     }
                     lastReciveTimeout.start(MWOS_RECIVE_TIMEOUT_DSEC);
                 }
                 if (recive_args.valueIsLong) {
-                    MW_LOG(F("Recive data ")); MW_LOG(recive_args.module_id);
-                        MW_LOG(':'); MW_LOG(recive_args.param_id); MW_LOG('='); MW_LOG(recive_args.array_index);
-                        MW_LOG(F(", error:")); MW_LOG_LN(errorCode);
                     //mwos.getModule(reciveModule_id)->onReciveStop(reciveParam_id, recive_offset, errorCode);
 #if MWOS_RECIVE_BLOCK_SIZE<0xffff
-                    if (errorCode==0) reciveModule->onReciveCmd(cmd,&recive_args);
+                    if (errorCode==0) reciveModule->onReciveCmd(recive_args.cmd,&recive_args);
 #else
                     if (errorCode==0) reciveModule->onReciveCmd(mwos_server_cmd_param_stop_block,&recive_args);
                     else reciveModule->onReciveCmd(mwos_server_cmd_param_error_block,&recive_args);
@@ -246,7 +254,7 @@ public:
      * @return
      */
     bool serverCommand() {
-        switch (cmd) {
+        switch (recive_args.cmd) {
             case mwos_server_cmd_param_save: // записать текущее значение параметра по месту хранения
                 reciveModule->saveValue(
                         reciveModule->getValueByParamID(recive_args.param_id,recive_args.array_index),
@@ -261,17 +269,17 @@ public:
                 sendFormatController();
                 return true;
             default:
-                if (cmd<mwos_server_cmd_get_format) { // команды модулю (и их параметрам)
-                    return reciveModule->onReciveCmd(cmd,&recive_args);
+                if (recive_args.cmd<mwos_server_cmd_get_format) { // команды модулю (и их параметрам)
+                    return reciveModule->onReciveCmd(recive_args.cmd,&recive_args);
                 }
         }
         return false;
     }
 
     void reciveClear(uint8_t code) {
-        if (code>0) {
+        //if (code>0) {
             MW_LOG(F("reciveClear: ")); MW_LOG(_cmdMode); MW_LOG(';'); MW_LOG_LN(code);
-        }
+        //}
         _cmdMode=0;
         reciveBlockSize=0;
         recive_block_timeout.stop();

@@ -30,7 +30,6 @@
 #include "MWOSModuleBase.h"
 #include "adlib/MWTimeout.h"
 
-
 class MWOSDebug : public Print {
   public:
 	bool inited=false;

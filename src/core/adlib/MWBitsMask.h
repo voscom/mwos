@@ -27,12 +27,16 @@ public:
         }
     }
 
+    size_t bytesSize() {
+        return bitsCount/8+ (bitsCount % 8 != 0);
+    }
+
     /**
      * Есть установленные биты
      * @return
      */
     bool haveSetBits() {
-        for (int32_t i = 0; i < (bitsCount/8+ (bitsCount % 8 != 0)); i++) {
+        for (int32_t i = 0; i < bytesSize(); i++) {
             if (bits[i]>0) return true;
         }
         return false;

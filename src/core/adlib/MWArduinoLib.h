@@ -56,7 +56,10 @@ void resetController() {
 
 uint32_t getChipID() {
     uint32_t chipID=0;
-#ifdef ESP8266
+#ifdef MWOS_CHIP_ID
+    chipID=MWOS_CHIP_ID;
+#else
+    #ifdef ESP8266
     chipID=ESP.getChipId();
 #endif
 #ifdef ESP32
@@ -64,7 +67,8 @@ uint32_t getChipID() {
 #endif
 #ifdef STM32_MCU_SERIES
     uint32_t *idBase3 =  (uint32_t *) (0x1FFFF7E8+0x08);
-		chipID=*(idBase3);
+    chipID=*(idBase3);
+#endif
 #endif
     return chipID;
 }

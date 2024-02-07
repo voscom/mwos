@@ -10,6 +10,10 @@
  */
 #include "MWOSSensorBase.h"
 
+// номер параметра с аналоговым значением датчика
+#define MWOS_SENSOR_ANALOG_PARAM_ID 9
+
+
 template<uint16_t sensorsCount>
 class MWOSSensorAnalog : public MWOSSensorBase<sensorsCount> {
 public:
@@ -32,7 +36,7 @@ public:
     //************************ описание параметров ***********************/
 
     // последние аналоговые показания
-    MWOS_PARAM(9, value, mwos_param_int32, mwos_param_sensor, mwos_param_storage_no, sensorsCount);
+    MWOS_PARAM(9, value, mwos_param_int32, mwos_param_readonly, mwos_param_storage_no, sensorsCount);
     // от какого значения - считать value_bin как бинарная единица
     MWOS_PARAM(10, fromValue, mwos_param_int32, mwos_param_option, mwos_param_storage_eeprom, 1);
     // до какого значения - считать value_bin как бинарная единица
@@ -50,7 +54,7 @@ public:
     //  если > 0 - игнорирует аналоговые изменения датчика больше этого значения как сбойные (два таких значения подряд будут пропущены)
     MWOS_PARAM(16, analogFilterMax, mwos_param_uint16, mwos_param_option, mwos_param_storage_eeprom, 1);
     // код ошибки для последней операции чтения показаний датчика
-    MWOS_PARAM(17, error, mwos_param_int8, mwos_param_sensor, mwos_param_storage_no, 1);
+    MWOS_PARAM(17, error, mwos_param_int8, mwos_param_readonly, mwos_param_storage_no, 1);
 
     MWOSSensorAnalog() : MWOSSensorBase<sensorsCount>() {
         MWOSModuleBase::AddParam(&p_value);
@@ -75,7 +79,7 @@ public:
         MWOSSensorBase<sensorsCount>::onInit();
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         if (param->id==9) return _value[arrayIndex];
         if (param->id==15) return getErrorCode();
         return MWOSSensorBase<sensorsCount>::getValue(param, arrayIndex); // отправим значение из EEPROM

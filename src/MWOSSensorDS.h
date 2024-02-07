@@ -23,8 +23,8 @@
 template<MWOS_PARAM_INDEX_UINT sensorsCount>
 class MWOSSensorDS : public MWOSSensorAnalog<sensorsCount> {
 public:
-    MWOS_PIN_INT _pin;
-    MWOS_PIN_INT _pinPower;
+    MWOS_PIN_INT _pin=-1;
+    MWOS_PIN_INT _pinPower=-1;
     int8_t _errorCode=0;
     int8_t initedStep; // текущий датчик DS
     OneWire * ds=NULL;
@@ -37,7 +37,7 @@ public:
     // порт включения питания для датчиков DS
     MWOS_PARAM(18, power, MWOS_PIN_INT_PTYPE, mwos_param_pin, mwos_param_storage_eeprom, 1);
     // адреса DS для каждого обнаруженного датчика
-    MWOS_PARAM(19, address, mwos_param_int64, mwos_param_readonly, mwos_param_storage_eeprom, sensorsCount);
+    MWOS_PARAM(19, address, mwos_param_int64, mwos_param_readonly+mwos_param_option, mwos_param_storage_eeprom, sensorsCount);
 
     /***
      * Создать датчики
@@ -76,14 +76,14 @@ public:
         if (_address[index]!=0) initedStep=0;
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         if (param->id==1) return _pin;
         if (param->id==18) return _pinPower;
         if (param->id==19) return _address[arrayIndex];
         return MWOSSensorAnalog<sensorsCount>::getValue(param, arrayIndex); // отправим значение из EEPROM
     }
 
-    virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex) {
         if (param->id==19) { // попытка записи в address - это команда
             if (v==0) MWOSSensorAnalog<sensorsCount>::saveValue(v,param,arrayIndex); // сохраним в EEPROM 0 вместо адреса DS  (сбросим адрес)
             if (v==-1) updateAllDS(); // команда для этого параметра - вызывает поиск датчиков DS

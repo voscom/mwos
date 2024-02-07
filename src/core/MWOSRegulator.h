@@ -47,7 +47,7 @@ public:
     }
 
 
-    virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual void setValue(int64_t v, MWOSParam * param, int16_t arrayIndex) {
         MW_LOG_MODULE(this,arrayIndex); MW_LOG(F("setValue: ")); MW_LOG_LN((int32_t) v);
         if (param==&p_turn) {
             if (v==2) {
@@ -70,7 +70,7 @@ public:
         }
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         switch (param->id) { // для скорости отправим текущие значения из локальнх переменных
             case 1: return _value;
             case 2: return _value2;

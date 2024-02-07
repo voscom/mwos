@@ -47,23 +47,26 @@ public:
         _pin[0]=pin;
     }
 
-    virtual void initSensor(int16_t index, bool pullOn) {
-        MW_LOG_MODULE(this); MW_LOG(F("MWOSSensorBin.def pin ")); MW_LOG(index); MW_LOG('='); MW_LOG_LN(_pin[index]);
+    void initSensor(int16_t index, bool pullOn) {
         MWOSSensorBase<sensorsCount>::initSensor(index, pullOn);
+        MW_LOG(F("pin ")); MW_LOG(index); MW_LOG('>');
         _pin[index]=MWOSSensorBase<sensorsCount>::loadValue(_pin[index], &p_pin, index);
         if (_pin[index]<0) return;
+        //MW_LOG_MODULE(this); MW_LOG(F("MWOSSensorBin.def pin ")); MW_LOG(index); MW_LOG('='); MW_LOG_LN(_pin[index]);
         if (pullOn || !MWOSSensorBase<sensorsCount>::_pull_off) mwos.pin(_pin[index])->mode(false, MWOSSensorBase<sensorsCount>::_sensor_pull);
         else mwos.pin(_pin[index])->mode(false, 0);
     }
 
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex= 0) {
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
         if (param->id==1) return _pin[arrayIndex];
         return MWOSSensorBase<sensorsCount>::getValue(param, arrayIndex); // отправим значение из EEPROM
     }
 
     virtual bool readBoolValue(uint16_t arrayIndex) {
         if (_pin[arrayIndex]<0) return 0;
-        return mwos.pin(_pin[arrayIndex])->readDigital();
+        bool res=mwos.pin(_pin[arrayIndex])->readDigital();
+        //MW_LOG_MODULE(this); MW_LOG(F("Get sensor ")); MW_LOG(arrayIndex); MW_LOG('='); MW_LOG_LN(res);
+        return res;
     }
 
 

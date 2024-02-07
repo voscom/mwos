@@ -80,7 +80,7 @@ int MWAsyncClient::connect(const char *host, uint16_t port){
 #else
   if(_client->connect(host, port)){
 #endif
-	  //Serial.println(F("Async connect to voscom.ru"));
+	// MW_LOG(F("Async connect"));
     //while(_client != NULL && !_client->connected() && !_client->disconnecting()) delay(1);
     return 1; //connected();
   }

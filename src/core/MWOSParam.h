@@ -21,6 +21,11 @@ class CLASS_MWOS_PARAM_##_p_name: public MWOSParam { \
     CLASS_MWOS_PARAM_##_p_name() : MWOSParam(_p_id, (char *) F(#_p_name), _p_value_type, ((MWOSParamGroup) ( _p_param_group )), _p_storage, _p_array_length) { } \
 } p_##_p_name;
 //VALUE_##_p_value_type _##_p_name[_p_array_length]={ AddChild(&p_##_p_name) };
+#define MWOS_PARAM_F(_p_id, _p_name, _p_value_type, _p_param_group, _p_storage, _p_array_length, _p_format) \
+class CLASS_MWOS_PARAM_##_p_name: public MWOSParam { \
+    public: \
+    CLASS_MWOS_PARAM_##_p_name() : MWOSParam(_p_id, (char *) F(#_p_format), _p_value_type, ((MWOSParamGroup) ( _p_param_group )), _p_storage, _p_array_length) { } \
+} p_##_p_name;
 
 
 class MWOSParam : public MWOSUnit {
@@ -34,7 +39,7 @@ public:
      * Или размер блока байтовых данных параметра 0..32k (задается просто положительным числом >0)
      */
     MWOS_PARAM_INDEX_UINT arrayLength; // 8bit или 16bit
-    ParamValueType valueType; // 8bit или 16bit
+    ParamValueType valueType; // 8bit
     MWOSParamGroup group; // 8bit - к какой группе относится параметр
     MWOSParamStorage storage; // 8-bit - Тип хранилища
 #pragma pack(pop)
@@ -45,7 +50,6 @@ public:
         arrayLength=param_array_length;
         if (arrayLength==0) arrayLength=1;
         valueType=value_type;
-        if (arrayLength>1) valueType= (ParamValueType) (valueType | ParamValueType::mwos_param_array);
         if (param_array_length<1) param_array_length=1;
     }
 
@@ -65,7 +69,8 @@ public:
      * @return
      */
     bool IsGroup(MWOSParamGroup paramGroup) {
-        return (group & paramGroup)>0;
+        if (paramGroup<32) return (group & 31)==paramGroup; // это тип параметра
+        return (group & paramGroup)>0; // это группа параметра
     }
 
     /**
@@ -86,7 +91,7 @@ public:
      * @return
      */
     bool IsLong() {
-        return (valueType<=mwos_param_string);
+        return (valueType<=mwos_param_string || valueType>=mwos_param_byte_array);
     }
 
     /**
@@ -94,8 +99,8 @@ public:
      * @return
      */
     bool IsBytes() {
-        if (valueType<0) return true;
-        return GetParamValueType() < mwos_param_bits1;
+        uint8_t onlyType=(valueType & 31);
+        return onlyType < mwos_param_bits1 || onlyType > mwos_param_bits7;
     }
 
     /***
@@ -106,14 +111,6 @@ public:
         return arrayLength;
     }
 
-    /***
-     * Возвращает базовый тип параметра (без учета массива)
-     * @return
-     */
-    ParamValueType GetParamValueType() {
-        return (ParamValueType)(valueType & (ParamValueType::mwos_param_array - 1));
-    }
-
      /**
       * Возвращает размер типовых данных параметра в битах
       * @param total   Суммарный обьем всех элементов массива (если данные параметра - массив), false - только одного элемента
@@ -121,7 +118,7 @@ public:
       */
     uint32_t bitsSize(bool total) {
         uint32_t res=0;
-        switch (GetParamValueType()) {
+        switch (valueType & 31) {
             case mwos_param_int8: res=8; break;
             case mwos_param_uint8: res=8; break;
             case mwos_param_int16: res=16; break;
@@ -140,7 +137,7 @@ public:
             case mwos_param_bits6: res=6; break;
             case mwos_param_bits7: res=7; break;
 
-            default: res=0;
+            default: res=8; // для остальных типов - длина 8 bit
         }
         if (total) res *= arrayCount();
         return res;

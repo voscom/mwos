@@ -28,11 +28,10 @@
  */
 #include "core/net/MWOSNetDevice.h"
 #include "core/net/MWOSNetIP.h"
-#include <core/net/w5500/AsyncEthernetClient.h>
+#include "core/net/w5500/AsyncEthernetClientW5500.h"
 //#define W5500_ETHERNET_SHIELD
 #define MWOS_SEND_BUFFER_USE 1 // использовать кольцевой буффер отправки
 #include <Ethernet2.h>
-#include "core/net/w5500/AsyncEthernetClient.h"
 
 #ifndef MWOS_NET_SS
 #define MWOS_NET_SS SS
@@ -45,21 +44,32 @@ public:
     uint8_t mac[6]= {0xF0,0x01,'m','w',0,0}; // MAC (последние 2 байта изменяются автоматически, чтобы избежать совпадений внутри сети)
 #pragma pack(pop)
 
+    MWOS_PARAM(10, pinsW5500, MWOS_PIN_INT_PTYPE, mwos_param_pin+mwos_param_readonly, mwos_param_storage_no, 4);
 
     MWOSNetW5500() : MWOSNetIP() {
+        AddParam(&p_pinsW5500); // добавим пины W5500, что-бы было видно, что они заняты
     }
 
     virtual void onInit() {
         MWOSNetIP::onInit();
+    }
 
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
+        if (param==&p_pinsW5500) {
+            if (arrayIndex==0) return MOSI;
+            if (arrayIndex==1) return MISO;
+            if (arrayIndex==2) return SCK;
+            if (arrayIndex==3) return MWOS_NET_SS;
+        }
+        return MWOSNetIP::getValue(param,arrayIndex);
     }
 
     virtual void connectToServer() { // начать подключение к серверу
         if (!_stream) {
-            AsyncEthernetClient * client=new AsyncEthernetClient();
+            AsyncEthernetClientW5500 * client=new AsyncEthernetClientW5500(1);
             _stream=(Stream *) client;
             //client->setTimeout((uint32_t) 6000); // таймаут 5 сек, чтобы успеть сбросить вачдог в 8 сек
-            MW_LOG_MODULE(this);  MW_LOG(F("MWOSController set stream: ")); MW_LOG((uint16_t) MWOS_SEND_BUFFER_SIZE);  MW_LOG(F(", mem:")); MW_LOG_LN(getFreeMemory());
+            MW_LOG_MODULE(this);  MW_LOG(F("MWOSController set stream: ")); MW_LOG((uint16_t) MWOS_SEND_BUFFER_SIZE);  MW_DEBUG_LOG_MEM(false);
         }
         MWOSNetIP::connectToServer();
     }
@@ -93,7 +103,7 @@ public:
     }
 
     virtual bool isConnectedServer(bool firstTime) { // есть подключение к серверу?
-        if (firstTime) return (( AsyncEthernetClient *) _stream)->status() == SnSR::ESTABLISHED;
+        if (firstTime) return (( AsyncEthernetClientW5500 *) _stream)->status() == SnSR::ESTABLISHED;
         return MWOSNetIP::isConnectedServer(firstTime);
     }
 
