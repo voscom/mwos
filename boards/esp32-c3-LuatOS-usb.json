@@ -1,0 +1,56 @@
+{
+  "build": {
+    "arduino": {
+      "memory_type": "dio_qspi"
+    },
+    "core": "esp32",
+    "extra_flags": [
+      "-DARDUINO_ESP32C3_DEV",
+      "-DCONFIG_BT_ENABLED=1",
+      "-DLOG_LOCAL_LEVEL=ESP_LOG_NONE",
+      "-DCORE_DEBUG_LEVEL=0",
+      "-DPINS_INPUT=9,8,4,5,7,6,10,3,2,0,1,12,18,19,13",
+      "-DPINS_INPUT_PULLUP=9,8,4,5,7,6,10,3,2,0,1,12,18,19,13",
+      "-DPINS_INPUT_PULLDOWN=9,8,4,5,7,6,10,3,2,0,1,12,18,19,13",
+      "-DPINS_ADC=0,1,2,3,4",
+      "-DPINS_OUTPUT=9,8,4,5,7,6,10,3,2,0,1,12,18,19,13",
+      "-DPINS_PWM=9,8,4,5,7,6,10,3,2,0,1,12,18,19,13",
+      "-DPINS_RTC=3,4,5",
+      "-DPINS_BOOT=9",
+      "-DPINS_LED=12,13",
+      "-DPINS_USB=20,21"
+    ],
+    "f_cpu": "160000000L",
+    "f_flash": "80000000L",
+    "flash_mode": "dio",
+    "flash_size": "4MB",
+    "hwids": [
+      ["0x303A", "0x1001"]
+    ],
+    "mcu": "esp32c3",
+    "partitions": "boards/mwos_esp32_4MB.csv",
+    "variant": "esp32c3"
+  },
+  "connectivity": [
+    "wifi",
+    "bluetooth"
+  ],
+  "debug": {
+    "openocd_target": "esp32c3.cfg"
+  },
+  "frameworks": [
+    "arduino",
+    "espidf"
+  ],
+  "name": "ESP32-C3 LuatOS (uart-usb)",
+  "upload": {
+    "flash_size": "4MB",
+    "maximum_ram_size": 327680,
+    "maximum_size": 4194304,
+    "require_upload_port": true,
+    "speed": 921600,
+    "protocol": "esptool"
+  },
+  "url": "https://www.espressif.com/en/products/socs/esp32c3",
+  "vendor": "Espressif / LuatOS"
+}

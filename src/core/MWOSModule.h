@@ -9,8 +9,8 @@
  * Пример:
     MWOSController() : MWOSModule() {
         // описание параметров
-        MWOS_PARAM(MWOS_controllerID,cid,mwos_param_uint32,mwos_param_storage_eeprom);
-        MWOS_PARAM(MWOS_sendTimeoutDSec,sendTimeoutDSec,mwos_param_uint16,mwos_param_storage_eeprom);
+        MWOS_PARAM(MWOS_controllerID,cid,mwos_param_uint32,MWOS_STORAGE_EEPROM);
+        MWOS_PARAM(MWOS_sendTimeoutDSec,sendTimeoutDSec,mwos_param_uint16,MWOS_STORAGE_EEPROM);
     }
  *
  */
@@ -21,20 +21,6 @@
 
 extern MWOS3 mwos;
 
-/***
- * Ссылка на массив и его длина, упакованное в значение INT64
- */
-struct PackValueArrayPrt {
-    union {
-        uint64_t value=0; // общий байт для всех битов настройки
-        struct {
-            uint32_t addr;
-            uint32_t size;
-        };
-    };
-};
-
-
 class MWOSModule: public MWOSModuleBase {
 public:
 
@@ -42,134 +28,229 @@ public:
         if (mwos.AddChild(this)) mwos.modulesCount++;
     }
 
-    /***
-     * Сохраняет значение параметра в хранилище (если хранилище задано)
-     * @param value Новое значение
-     * @param param
-     * @param arrayIndex
+    /**
+     * Прочитать значение из хранилища
+     * @param value
+     * @return Сколько байт было прочитано
      */
-    void saveValue(int64_t value, MWOSParam * param, int16_t arrayIndex=0) {
-        if (param->IsLong()) {
-            PackValueArrayPrt v;
-            v.value=value;
-            value=((uint8_t *) v.addr)[arrayIndex];
-        }
-        mwos.saveValue(value,this,param,arrayIndex);
+    mwos_size loadValue(MWValue &value) {
+        value.module_id=id;
+        return mwos.loadValueFromStorage(value);
     }
 
-    /***
-     * Сохраняет значение параметра в хранилище (если хранилище задано)
-     * @param value Новое значение
-     * @param paramId
-     * @param arrayIndex
-     */
-    void saveValue(int64_t value, uint16_t paramId, int16_t arrayIndex=0) {
-        saveValue(value,getParam(paramId),arrayIndex);
+    int64_t loadValueInt(const int64_t defValue, const MWOSParam &param, int16_t arrayIndex) {
+        MWValue res(param.valueType,id,param.id,arrayIndex);
+        res.setValueInt(defValue);
+        mwos.loadValueFromStorage(res);
+        return res.toInt();
+    }
+
+    double loadValueDouble(const double defValue, const MWOSParam &param, int16_t arrayIndex) {
+        MWValue res(param.valueType,id,param.id,arrayIndex);
+        res.setValueDouble(defValue);
+        mwos.loadValueFromStorage(res);
+        return res.toDouble();
+    }
+
+    String loadValueString(const String &defValue, const MWOSParam &param, uint16_t arrayIndex=0xffff) {
+        MWValue res(param.valueType,id,param.id,arrayIndex);
+        res.setString(defValue.c_str());
+        mwos.loadValueFromStorage(res);
+        return res.toString();
     }
 
     /**
-     * Прочитать значение параметра из хранилища
-     * @param param
-     * @param arrayIndex
+     * Записать значение в хранилище
+     * @param value
+     * @return Сколько реально было записано
+     */
+    mwos_size saveValue(MWValue &value) {
+        value.module_id=id;
+        return mwos.saveValueToStorage(value);
+    }
+
+    bool saveValueInt(const int64_t newValue, const MWOSParam &param, int16_t arrayIndex) {
+        MWValue res(param.valueType,id,param.id,arrayIndex);
+        res.setValueInt(newValue);
+        return mwos.saveValueToStorage(res)>0;
+    }
+
+    bool saveValueDouble(const double newValue, const MWOSParam &param, int16_t arrayIndex) {
+        MWValue res(param.valueType,id,param.id,arrayIndex);
+        res.setValueDouble(newValue);
+        return mwos.saveValueToStorage(res)>0;
+    }
+
+    bool saveValueString(const String &newValue, const MWOSParam &param, int16_t arrayIndex) {
+        MWValue res(param.valueType,id,param.id,arrayIndex);
+        res.setString(newValue.c_str());
+        return mwos.saveValueToStorage(res)>0;
+    }
+
+    /**
+     * Найти модуль, по его id из параметра.
+     * Если не сохранен в настройках или задан с ошибкой - использует значение по умолчанию.
+     * А если и значение по умолчанию не задано, то ищет первый модуль с таким типом (кроме текущего).
+     * Если итоговый модуль не соответствует сохраненному, то сохраняет полученный
+     * @param defaultModule Модуль по умолчанию (если не сохранен в настройках или задан с ошибкой)
+     * @param type      Тип модуля  (если MODULE_UNDEFINED, то не использует)
+     * @param param     Параметр, содержащий Id модуля
+     * @param arrayIndex    Индекс параметра, содержащий Id модуля
      * @return
      */
-    int64_t loadValue(int64_t defValue, MWOSParam * param, int16_t arrayIndex=0) {
-        int64_t res=mwos.loadValue(defValue,this,param,arrayIndex);
-        if (param->IsGroup(mwos_param_option) && res!=defValue) { // это настройки и не значение по умолчанию
-            switch ((uint8_t) param->storage) { // пометим хранилище модуля актуальным
-                case 0:
-                    if (!storage0Init) {
-                        MW_LOG_MODULE(this); MW_LOG_LN(F("storage inited: 0"));
-                        storage0Init=true;
+    MWOSModuleBase * loadLinkModule(MWOSModule &defaultModule, ModuleType type, MWOSParam &param, int16_t arrayIndex) {
+        MWOSUnit * res=&defaultModule;
+        int16_t param_id=loadValueInt(-2,param,arrayIndex);
+        if (param_id>=0) {
+            MWOSUnit * unit=mwos.FindChildById(param_id);
+            if (unit && (type==MODULE_UNDEFINED || unit->moduleType==type)) res=unit;
+        }
+        if (type!=MODULE_UNDEFINED && param_id==-2 && !res) res = mwos.FindChildByModuleType(type,this);
+        if (res) {
+            if (res->id != param_id) {
+                saveValueInt(res->id,param,arrayIndex);
+                SetParamChanged(&param,arrayIndex);
+            }
+        } else {
+            if (param_id==-2) {
+                saveValueInt(-1,param,arrayIndex);
+                SetParamChanged(&param,arrayIndex);
+            }
+        }
+        return (MWOSModule *) res;
+    }
+
+    /**
+     * Найти параметр по имени и сохранить в него значение из текста
+     * @param str             Значение текстом (не пустая строка). Можно несколько значений через запятую. Строковое значение может быть в кавычках.
+     * @param paramObj      Объект параметра
+     * @param arrayIndexStr    Индекс (пустая строка - все индексы от 0)
+     * @param saveValueNow    После установки значения сразу сохранить его в хранилище
+     * @return
+     */
+    bool setValueStrToParam(const String &str, MWOSParam * paramObj, String arrayIndexStr, bool saveValueNow) {
+        if (paramObj==NULL) return false;
+        bool allValues;
+        if (arrayIndexStr=="" || arrayIndexStr[0]>'9' || arrayIndexStr[0]<'0') {
+            allValues=true;
+        } else {
+            allValues=false;
+        }
+        MWValue mwv(paramObj->valueType,id,paramObj->id,0xffff);
+        if (paramObj->IsString()) {
+            mwv.setString(str.c_str());
+            mwv.param_index=0xffff; // все значения
+            setValue(mwv);
+            if (saveValueNow) mwos.saveValueToStorage(mwv);
+            return true;
+        }
+        if (allValues && paramObj->arrayCount()>1) { // это не один параметр
+            int lastPV=0;
+            for (int16_t i=0; i<paramObj->arrayCount(); i++) {
+                String vi;
+                int pV=str.indexOf(',',lastPV);
+                if (pV>=0) {
+                    vi=str.substring(lastPV,pV);
+                } else {
+                    vi=str.substring(lastPV);
+                }
+                mwv.parseString(vi.c_str());
+                setValue(mwv);
+                if (saveValueNow) mwos.saveValueToStorage(mwv);
+                if (pV<0) break;
+                else lastPV=pV+1;
+            }
+        } else {
+            int16_t arrayIndexInt=arrayIndexStr.toInt();
+            if (arrayIndexInt<0 || arrayIndexInt>paramObj->arrayCount())
+            mwv.param_index=arrayIndexInt;
+            mwv.parseString(str.c_str());
+            setValue(mwv);
+            if (saveValueNow) mwos.saveValueToStorage(mwv);
+            //MW_LOG_MODULE(this,paramObj,arrayIndexInt); MW_LOG(F("value = ")); MW_LOG_LN(v);
+        }
+        return true;
+    }
+
+    /**
+     * Получить текстовое значения параметра (или список значений параметра через запятую)
+    * @param param      Объект параметра
+     * @param arrayIndex    Индекс (пустая строка - все индексы от 0)
+     * @return Значения параметра
+     */
+    String getValueStrFromParam(MWOSParam * param, const String &arrayIndex) {
+        if (!param) return "";
+        int16_t arrayIndexInt=0;
+        bool allValues;
+        if (arrayIndex=="" || arrayIndex[0]>'9' || arrayIndex[0]<'0') {
+            allValues=true;
+        } else {
+            allValues=false;
+            arrayIndexInt=arrayIndex.toInt();
+        }
+        MWValue v(param->valueType,id,param->id,arrayIndexInt);
+        onEvent(EVENT_GET_VALUE,v);
+        if (param->IsString()) {
+            v.param_index=0xffff; // все значения
+            return '"'+v.toString()+'"';
+        }
+        String result=v.toString();
+        if (allValues && param->arrayCount()>1) {
+            // это не один параметр
+            for (int16_t i=1; i<param->arrayCount(); i++) {
+                v.param_index=i;
+                onEvent(EVENT_GET_VALUE,v);
+                result+=", "+v.toString();
+            }
+        }
+        return result;
+    }
+
+    /***
+     * Помечает значение, как измененное для отправки.
+     * При необходимости - сохраняет в хранилище.
+     * Пины проверяет на ошибки (занятые пины).
+     * Вызывается при получении нового значения от сервера
+     */
+    void onReceiveValue(MWValue &data) {
+        MWOSParam * param=getParam(data.param_id);
+        if (param) {
+            MW_LOG_MODULE(this, param, data.param_index); MW_LOG(F("onReceiveValue = ")); MW_LOG_LN(data.toString());
+            SetParamChanged(param, data.param_index, true);
+            if (data.type == PARAM_AUTO) data.type = param->valueType;
+            if (!param->IsGroup(PARAM_TYPE_READONLY)) { // параметр не имеет флага readonly
+#ifndef MWOS_GLOBAL_NO_PIN
+                if (param->IsGroup(PARAM_TYPE_PIN)) { // для пинов, проверим что этот пин не занят
+                    MWOS_PIN_INT pin= (MWOS_PIN_INT) data.toInt();
+                    if (mwos.FindByPin(pin)) {
+                        pin=-2; // этот пин уже занят - запишем (-2 - ошибка)
+                        data.setValueInt(pin);
                     }
-                    break;
-                case 1: storage1Init=true; break;
-                case 2: storage2Init=true; break;
-                case 3: storage3Init=true; break;
+                }
+#endif
+                if (mwos.saveValueToStorage(data)>0) {  // сохраним в хранилище
+
+                }
             }
-        }
-        return res;
-    }
-
-    /**
-     * Упаковать байтовый массив в значение int64, пригодное для сохранения и отправки
-     * @param buffer   байтовый массив
-     * @param size   размер
-     * @return  Упакованное значение
-     */
-    int64_t packByteArrayToValue(const uint8_t * buffer, size_t size) {
-        PackValueArrayPrt v;
-        v.addr=(uint32_t) buffer;
-        v.size=size;
-        return v.value;
-    }
-
-    /**
-     * Упаковать строку в значение int64, пригодное для сохранения и отправки
-     * @param str   Строка
-     * @return  Упакованное значение
-     */
-    size_t packStringToValue(const char * str) {
-        return packByteArrayToValue((uint8_t *) str, strlen(str));
-    }
-
-    /**
-     * Упаковать строку в значение int64, пригодное для сохранения и отправки
-     * @param str   Строка
-     * @return  Упакованное значение
-     */
-    int64_t packStringToValue(const String &str) {
-        return packByteArrayToValue((uint8_t *) str.c_str(), str.length());
-    }
-
-    /**
-      * Прочитать значение параметра из хранилища
-      * @param paramId
-      * @param arrayIndex
-      * @return
-      */
-    int64_t loadValue(int64_t defValue, int16_t paramId, int16_t arrayIndex=0) {
-        return loadValue(defValue,getParam(paramId),arrayIndex);
-    }
-
-    /**
-     * Вызывается при запросе значения параметра
-     * @param paramNum  Номер параметра
-     * @param arrayIndex Номер индекса в массиве значений параметра (если это массив)
-     * @return  Значение
-     */
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
-        return loadValue(0,param,arrayIndex);
-    }
-
-    /***
-     * Вызывается при изменении параметра
-     * @param value     Значение для изменения
-     * @param param     параметр
-     * @param arrayIndex Номер индекса в массиве значений параметра (если это массив)
-     */
-    virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex) {
-        SetParamChanged(param,arrayIndex, true);
-        if (!param->IsGroup(mwos_param_readonly)) { // параметр не имеет флага readonly
-            if (param->IsGroup(mwos_param_pin) && value>=0) { // для пинов, проверим что этот пин не занят
-                if (mwos.FindByPin(value)!=NULL) value=-2; // этот пин уже занят - запишем (-2 - ошибка)
-            }
-            saveValue(value, param, arrayIndex); // сохраним в хранилище
+            onEvent(EVENT_CHANGE,data); // после изменения настроек или пинов - вызовем событие EVENT_CHANGE
         }
     }
 
     /***
-     * Событие изменения значения для записи в журнал
-     * @param value
-     * @param param
-     * @param arrayIndex
+     * Вызывается на многие системные события и каждый тик операционной системы.
+     * Так же, вызывается при запросе значений и приходе новых данных.
+     * @param modeEvent    Тип вызываемого системного события
+     * @param data    Данные, передаваемые в событие, и возвращаемые из события (просто изменить data)
      */
-    void toLog(int64_t value, MWOSParam * param, int16_t arrayIndex=0) {
-        mwos.toLog(value,this,param,arrayIndex);
+    virtual void onEvent(MWOSModeEvent modeEvent, MWValue &data) {
+        switch (modeEvent) {
+            case EVENT_SET_VALUE: onReceiveValue(data); break;
+            case EVENT_GET_VALUE: loadValue(data); break;
+        }
     }
 
 
 };
 
 
-#endif //MWOS3_MWOSMODULEPARAMS_H
+#endif

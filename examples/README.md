@@ -14,8 +14,8 @@ pio run -e платформа
 1. [esp32-s3-devkitc-1](./platform/esp32-s3-devkitc-1/README.md)
 2. [megaatmega2560](./platform/megaatmega2560/README.md)
 3. [esp32dev](./platform/esp32doit-devkit-v1/README.md)
-4. [bluepill_f103c8](./platform/bluepill_f103c8/README.md)
-5. [blackpill_f411ce](./platform/blackpill_f411ce/README.md)
+4. [bluepill_f103c8](platform/stm32f103_bluepill/README.md)
+5. [blackpill_f411ce](platform/stm32f4x1_blackpill/README.md)
 
 Например, для компиляции под [megaatmega2560](./platform/megaatmega2560/README.md):
 ```
@@ -38,9 +38,5 @@ pio run -e megaatmega2560
 ### Конфигурирование MWOS
 Пример конфиругирования MWOS можно посмотреть в файле:
 [MWOSConfig.h](./mwos_example/MWOSConfig.h)
-
-
-
-
 
 

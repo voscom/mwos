@@ -1,5 +1,5 @@
 # MWOS3 - стандартные хранилища
-Основано на классе [MWStream](MWStream.h)
+Основано на классе [MWStream](MWStreamAddr.h)
 
 Можно использовать из [MWOSStorageStream](../../storages/MWOSStorageStream.h)
 

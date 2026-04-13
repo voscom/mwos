@@ -1,0 +1,10 @@
+# pio run --target erase -e esp32-s3-n16r8v
+# partitions: app0=1.5Mb, app1(update)=1.5Mb, spiffs(littleFS)=12,877,824b, nvs=192Kb
+# Name,   Type, SubType, Offset,   Size, Flags
+otadata,  data, ota,     0x000e000, 0x0002000,
+app0,     app,  ota_0,   0x0010000, 0x01D0000, encrypted
+app1,     app,  ota_1,   0x01E0000, 0x01D0000, encrypted
+spiffs,   data, spiffs,  0x03B0000, 0x1C08000,
+nvs1,     data, nvs,     0x1FB8000, 0x0008000,
+nvs,      data, nvs,     0x1FC0000, 0x0030000,
+coredump, data, coredump,0x1FF0000, 0x0010000,

@@ -30,15 +30,22 @@
 #define MWOS_ESP_EEPROM_SIZE 2048
 #endif
 
-#include "MWStream.h"
+#ifndef MWOS_STORAGE_EEPROM_OFFSET
+// Смещение начала хранилища в EEPROM (если необходимо освободить начало EEPROM под другие нужды).
+// По этому адресу хранится CID, и далее - хранилище в EEPROM.
+#define MWOS_STORAGE_EEPROM_OFFSET 0
+#endif
 
-class MWEEPROMClass : public MWStream {
+#include "MWStreamAddr.h"
+
+class MWEEPROMClass : public MWStreamAddr {
 public:
+#if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_EEPROM)
 
     virtual bool begin() {
     	if (inited) return true;
 #if defined(ESP8266) || defined(ESP32)
-		MW_LOG(F("Inited EEPROM: ")); MW_LOG(MWOS_ESP_EEPROM_SIZE); MW_LOG(F("b, "));  MW_DEBUG_LOG_MEM(false);
+        // MW_LOG_TIME(); MW_LOG(F("Inited ESP EEPROM: ")); MW_LOG_LN(MWOS_ESP_EEPROM_SIZE);
     	EEPROM.begin(MWOS_ESP_EEPROM_SIZE);
 #endif
 #ifdef STM32_MCU_SERIES
@@ -46,14 +53,14 @@ public:
         eeprom_buffer_fill();  // Copy the data from the flash to the buffer
 #endif
 #endif
-    	return MWStream::begin();
+    	return MWStreamAddr::begin();
     }
 
     virtual bool end() {
 #if defined(ESP8266) || defined(ESP32)
     	EEPROM.end();
 #endif
-    	return MWStream::end();
+    	return MWStreamAddr::end();
     }
 
     virtual int available() { return 0; }
@@ -74,7 +81,7 @@ public:
         eeprom_buffer_flush(); // Copy the data from the buffer to the flash
 #endif
 #endif
-        return MWStream::commit();
+        return MWStreamAddr::commit();
 	}
 
     virtual size_t length() {
@@ -118,9 +125,11 @@ public:
 #endif
         return 1;
     }
-
+#endif
 
 };
+#if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_EEPROM)
 MWEEPROMClass MWEEPROM;
+#endif
 
 #endif

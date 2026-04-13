@@ -24,49 +24,45 @@
 #include <Arduino.h>
 #include <Print.h>
 #include <IPAddress.h>
-#if MWOS_FILE_SYSTEM>0
-#include <FS.h>
-#endif
 #include "MWOSModuleBase.h"
 #include "adlib/MWTimeout.h"
+#include "adlib/MWArduinoLib.h"
 
 class MWOSDebug : public Print {
   public:
-	bool inited=false;
-#if MWOS_FILE_SYSTEM>0
-	File * file=NULL;
-#endif
+	Stream * logStream=NULL;
 
     virtual size_t write(uint8_t byte) {
-#if MWOS_FILE_SYSTEM>0
-    	if (file!=NULL) file->write(byte);
-#endif
-    	return MWOS_DEBUG .write(byte);
+    	if (logStream==NULL && !begin()) return 0;
+    	return logStream->write(byte);
     }
     virtual int peek() {
     	return 0;
     }
     virtual int read() {
-    	return MWOS_DEBUG .read();
+    	if (logStream==NULL && !begin()) return 0;
+    	return logStream->read();
     }
     virtual int available() {
-    	return MWOS_DEBUG .available();
+    	if (logStream==NULL && !begin()) return 0;
+    	return logStream->available();
     }
     virtual void flush() {
-#if MWOS_FILE_SYSTEM>0
-    	if (file!=NULL) file->flush();
-#endif
-        MWOS_DEBUG .flush();
+    	if (logStream==NULL && !begin()) return;
+        logStream->flush();
     }
 
-    virtual int begin(unsigned long baud) {
-    	if (!inited) {
-            MWOS_DEBUG .begin(baud);
-    		inited=true;
+    virtual bool begin(Stream * stream=NULL) {
+    	if (logStream==NULL) logStream = stream;
+    	if (logStream==NULL) {
+#if (MWOS_DEBUG==1)
+    		logStream = &Serial;
+#endif
     	}
+    	if (logStream==NULL) return false;
     	initFPS();
     	initMem();
-    	return 0;
+    	return true;
     }
 
     uint16_t printStrPROGMEM(char * StrPROGMEM) {
@@ -79,19 +75,36 @@ class MWOSDebug : public Print {
         return size;
     }
 
-    uint16_t printModule(MWOSUnit * module,uint16_t index=UINT16_MAX) {
-    	uint16_t size=0;
-    	uint32_t tm=millis();
-    	size+=print(tm/60000);
-    	size+=print(':');
-    	size+=print((tm % 60000)/1000);
-    	size+=print('.');
-    	size+=print(tm % 1000);
-    	size+=print('>');
+    uint16_t printTime() {
+        uint16_t size=0;
+        uint32_t tm=millis();
+        size+=print(tm/60000);
+        size+=print(':');
+        uint16_t sec=(tm % 60000)/1000;
+        if (sec<10) size+=print('0');
+        size+=print(sec);
+        size+=print('.');
+        uint16_t msec=tm % 1000;
+        if (msec<10) size+=print('0');
+        if (msec<100) size+=print('0');
+        size+=print(msec);
+        size+=print('>');
+        size+=print(' ');
+        return size;
+    }
+
+    uint16_t printModule(MWOSUnit * module, MWOSParam * param=NULL, int16_t index=-1) {
+    	uint16_t size=printTime();
         size+=module->printName(this);
         size+=print('.');
         size+=print(module->id);
-        if (index!=UINT16_MAX) {
+        if (param!=NULL) {
+            size+=print(':');
+            size+=param->printName(this);
+            size+=print('.');
+            size+=print(param->id);
+        }
+        if (index>=0 || param!=NULL) {
             size+=print(':');
             size+=print(index);
         }
@@ -130,26 +143,41 @@ class MWOSDebug : public Print {
     	return size;
 	}
 
-	uint16_t printByte(unsigned char bt) {
+	uint16_t printByte(uint8_t bt, uint8_t splitter=0, int sys = HEX) {
 		uint16_t size=0;
-		if (bt<16) { size+=print('0'); }
-		size+=print(bt,HEX);
+		if (splitter>0) write(splitter);
+		if (bt<sys) { size+=write('0'); }
+		size+=print(bt,sys);
 		return size;
 	}
 
-	uint16_t printBytes(unsigned char * bts, uint16_t len) {
+	uint16_t printBytes(uint8_t * bts, uint16_t len, uint16_t maxLen=25, int sys = HEX) {
+        if (len==0) return 0;
 		uint16_t size=0;
 		size+=print('#');
 		for (uint16_t i=0; i<len; i++) {
-			size+=print(' ');
-			size+=printByte(bts[i]);
-			if (i>15) {
-				size+=print('~');
+			size+=printByte(bts[i],' ', sys);
+			if (i>maxLen) {
+				size+=write('~');
 				break;
 			}
 		}
 		return size;
 	}
+
+    uint16_t printChars(char * bts, uint16_t len) {
+        if (len==0) return 0;
+        uint16_t size=0;
+        size+=print('$');
+        for (uint16_t i=0; i<len; i++) {
+            size+=write((char) bts[i]);
+            if (i>25) {
+                size+=write('~');
+                break;
+            }
+        }
+        return size;
+    }
 
 	/**
 	 * Необходимо вызывать 1 раз за глобальный цикл
@@ -233,26 +261,33 @@ MWOSDebug debug_mw;
 
 #ifdef MW_DEBUG_PORT
 #define MW_LOG(...) MW_DEBUG_PORT.print( __VA_ARGS__ )
+#define MW_LOGF(...) MW_DEBUG_PORT.printf( __VA_ARGS__ )
 #define MW_LOG_LN(...) MW_DEBUG_PORT.println( __VA_ARGS__ )
 #define MW_LOG_MODULE(...) MW_DEBUG_PORT.printModule( __VA_ARGS__ )
 #define MW_LOG_BYTE(...) MW_DEBUG_PORT.printByte( __VA_ARGS__ )
 #define MW_LOG_BYTES(...) MW_DEBUG_PORT.printBytes( __VA_ARGS__ )
+#define MW_LOG_CHARS(...) MW_DEBUG_PORT.printChars( __VA_ARGS__ )
 #define MW_LOG_ADDR(...) MW_DEBUG_PORT.print_address( __VA_ARGS__ )
 #define MW_LOG_PROGMEM(...) MW_DEBUG_PORT.printStrPROGMEM( __VA_ARGS__ )
+#define MW_LOG_TIME(...) MW_DEBUG_PORT.printTime()
 
 #define MW_DEBUG_LOG_FPS(...) MW_DEBUG_PORT.printFPS(__VA_ARGS__)
 #define MW_DEBUG_LOG_MEM(...) MW_DEBUG_PORT.printMem(__VA_ARGS__)
 #define MW_DEBUG_UPDATE_FPS(...) MW_DEBUG_PORT.updateFPS()
 #define MW_DEBUG_UPDATE_MEM(...) MW_DEBUG_PORT.updateMem()
 #define MW_DEBUG_BEGIN(...) MW_DEBUG_PORT.begin( __VA_ARGS__ )
+#define MW_LOG_FLUSH(...) MW_DEBUG_PORT.flush()
 
 #else
 
 #define MW_LOG(...)
+#define MW_LOGF(...)
 #define MW_LOG_MODULE(...)
 #define MW_LOG_LN(...)
 #define MW_LOG_ADDR(...)
 #define MW_LOG_PROGMEM(...)
+#define MW_LOG_TIME(...)
+#define MW_LOG_FLUSH(...)
 
 #define MW_DEBUG_LOG_MEM(...)
 #define MW_DEBUG_LOG_FPS(...)
@@ -261,6 +296,7 @@ MWOSDebug debug_mw;
 #define MW_DEBUG_BEGIN(...)
 #define MW_LOG_BYTE(...)
 #define MW_LOG_BYTES(...)
+#define MW_LOG_CHARS(...)
 
 #endif
 

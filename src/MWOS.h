@@ -19,14 +19,7 @@
 #endif
 
 #include "core/MWOS3.h"
-#include "core/net/MWOSModuleLog.h"
-#ifdef ESP8266
-#include <MWOSNetWiFi.h>
-#endif
-#ifdef ESP32
-#include <MWOSNetWiFi.h>
-#endif
-
+#include "core/MWOSModule.h"
 
 void mwos_start() {
     mwos.start();

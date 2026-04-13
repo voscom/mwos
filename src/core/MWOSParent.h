@@ -35,6 +35,8 @@ public:
 
     /**
      * Добавить к дочернему списку новый объект
+     * если новый объект содержит id - сортирует список по id
+     * если id=0, то он добавляется как максимальный дочерний id+1
      */
     bool AddChild(MWOSUnit * newUnit) {
         if (newUnit==NULL || (newUnit->id>0 && indexOfChildById(newUnit->id)>=0)) { // обект не задан или уже есть с этим id
@@ -48,19 +50,25 @@ public:
         }
         MWOSUnit * unit=child;
         MWOSUnit * lastUnit=NULL;
-        int n=0;
+        MWOS_PARAM_UINT maxId=0;
         while (unit!=NULL && unit->unitType==newUnit->unitType) {  // ищем конец списка
+            if (newUnit->id>0) {
+                if (unit->id > newUnit->id) break; // нашли место в списке по id
+            } else {
+                if (unit->id > maxId) maxId=unit->id;
+            }
             lastUnit=unit;
-            n++;
             unit=unit->next;
         }
-        if (lastUnit!=NULL) {
-            newUnit->next=this;
-            if (newUnit->id==0 && newUnit->unitType!=PARAM) newUnit->id=n; // автоматом расставим id, если они не были заданы при создании
+        if (lastUnit==NULL) {
+            newUnit->next=child;
+            child=newUnit;
+        } else {
+            newUnit->next=lastUnit->next;
             lastUnit->next=newUnit;
-            return true;
         }
-        return false;
+        if (newUnit->id==0 && newUnit->unitType!=PARAM) newUnit->id= maxId + 1; // автоматом расставим id для модулей, если они не были заданы при создании
+        return true;
     }
 
     int16_t indexOfChildById(uint16_t unit_id) {
@@ -105,17 +113,59 @@ public:
     }
 
     /***
-     * Найти дочерний элемент по типу модуля
-     * @param needModuleType
-     * @return
+     * Найти дочерний элемент (только для модулей) по типу модуля
+     * @param needModuleType    Тип модуля
+     * @param notThisModule     Кроме указанного (указанный MWOSUnit исключается из результата поиска)
+     * @return  Первый модуль такого типа (или NULL)
      */
-    MWOSUnit * FindChildByModuleType(ModuleType needModuleType) {
+    MWOSUnit * FindChildByModuleType(ModuleType needModuleType, MWOSUnit * notThisModule=NULL) {
         MWOSUnit * unit=child;
         while (unit!=NULL && unit->unitType==child->unitType) {  // ищем конец списка
-            if (unit->moduleType==needModuleType) return unit;
+            if ((unit->moduleType==needModuleType) && unit != notThisModule) return unit;
             unit=unit->next;
         }
         return NULL;
+    }
+
+    /**
+     * Найти дочерний элемент по имени (элементы могут содержать имя внутри JSON)
+     * @param childName Искомое имя (без JSON)
+     * @return
+     */
+    MWOSUnit * FindChildByName(const char * childName) {
+        MWOSUnit * unit=child;
+        while (unit!=NULL && unit->unitType==child->unitType) {  // ищем конец списка
+            if (unit->IsName(childName,false)) return unit;
+            unit=unit->next;
+        }
+        return NULL;
+    }
+
+
+    /**
+     * Расчитать CRC для имен и id всех дочерних элементов
+     * @param crc   Куда и как расчитывать CRC
+     * @param storageType  добавить контрольную сумму всех параметров этого хранилища
+     * @return  Если есть модули или параметры с id>255
+     */
+    bool crcOfChilds(MW_CRC * crc, int8_t storageType) {
+        bool res=false;
+        MWOSUnit * unitNext=child;
+        while (unitNext!=NULL && unitNext->unitType==child->unitType) {
+            if (id>0xff) res= true;
+            if (unitNext->unitType==UnitType::PARAM) {
+                if (unitNext->storage==storageType) {
+                    unitNext->crcOfName(crc); // crc имени
+                    crc->add(id & 0xff); // crc id low
+                    crc->add((id >> 8) & 0xff); // crc id hi
+                }
+            }
+            if (unitNext->unitType==UnitType::MODULE) {
+                if (((MWOSParent *) unitNext)->crcOfChilds(crc,storageType)) res= true; // рекурсивно для всех параметров этого хранилища каждого модуля
+            }
+            unitNext=unitNext->next;
+        }
+        return res;
     }
 
 

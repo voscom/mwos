@@ -17,6 +17,13 @@ public:
         bits=new uint8_t[bitsCount/8+ (bitsCount % 8 != 0)];
     }
 
+    void free() {
+        if (bits!=NULL) {
+            delete[] bits;
+            bits=NULL;
+        }
+    }
+
     /***
      * Заполнить весь массив одинаковым байтовым значением
      * @param fillValue Байтовое значение (обычно 0 или 0xff)
@@ -36,7 +43,7 @@ public:
      * @return
      */
     bool haveSetBits() {
-        for (int32_t i = 0; i < bytesSize(); i++) {
+        for (size_t i = 0; i < bytesSize(); i++) {
             if (bits[i]>0) return true;
         }
         return false;

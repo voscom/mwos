@@ -1,0 +1,12 @@
+#!/bin/sh
+# хук (bush-скрипт) выполняется после комита
+# Нужно добавить в глобальный конфиг Git параметр core.hooksPath, значение которого содержит путь до глобальной папки с хуками, откуда Git будет все тянуть в первую очередь.
+# git config --global core.hooksPath /your_path_to_hooks_folder
+# и в этой папке положить этот хук
+# Проверим, что конфиг сохранился:
+# git config --global --list
+# И увидим в списке глобальных переменных что-то вроде:
+# core.hookspath=/usr/local/.../git/hooks
+
+echo $PWD/$1 >>d:/git.log
+echo \r\n >>d:/git.log

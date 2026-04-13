@@ -2,17 +2,34 @@
 #define MWOS3_MWOSNETIP_H
 
 #include "Client.h"
+#include "core/net/MWOSNet.h"
 
-const char server_url1[] PROGMEM = "voscom.online";
-const char server_url2[] PROGMEM = "voscom.ru";
-const char server_url3[] PROGMEM = "voscom.ddns.net";
+// можно прописать до 3-х альтернативных адресов сервера
+#ifdef MWOS_SERVER_HOST1
+const char server_url1[] PROGMEM = MWOS_SERVER_HOST1;
+#endif
+#ifdef MWOS_SERVER_HOST2
+const char server_url2[] PROGMEM = MWOS_SERVER_HOST2;
+#endif
+#ifdef MWOS_SERVER_HOST3
+const char server_url3[] PROGMEM = MWOS_SERVER_HOST3;
+#endif
+
+//#define STATIC_IP {192,168,0,54}
+//#define STATIC_GATEWAY {192,168,0,1}
+//#define STATIC_SUBNET {255,255,255,0}
+//#define STATIC_DNS {192,168,0,1}
 
 #ifndef MWOS_SERVER_PORT
-#define MWOS_SERVER_PORT 8082
+#define MWOS_SERVER_PORT 8081
 #endif
 
 #ifndef MWOS_SERVER_HOST
-#define MWOS_SERVER_HOST "voscom.online"
+#define MWOS_SERVER_HOST "mwos.voscom.online"
+#endif
+
+#ifndef CNM
+#define CNM "Net"
 #endif
 
 /**
@@ -33,108 +50,177 @@ const char server_url3[] PROGMEM = "voscom.ddns.net";
  * По умолчанию - voscom.online:88
  *
  */
-class MWOSNetIP : public MWOSNetDevice {
+class MWOSNetIP : public MWOSNet {
 public:
 
-#pragma pack(push,1)
-    uint8_t reconnectStep=0;
-    uint8_t reconnectCount=0;
-    uint16_t ip4=0;
-    uint32_t ipPort=0;
-#pragma pack(pop)
+    // тип подключения
+    MWOS_PARAM_FF(11, dhcp, PARAM_BITS2, PARAM_TYPE_OPTIONS, MWOS_STORAGE_EEPROM, 1, "DHCP;STATIC IP4");
+    // static IP
+    MWOS_PARAM(12, staticIP, PARAM_UINT8, PARAM_TYPE_OPTIONS, MWOS_STORAGE_EEPROM, 4);
+    // static gateway
+    MWOS_PARAM(13, gateway, PARAM_UINT8, PARAM_TYPE_OPTIONS, MWOS_STORAGE_EEPROM, 4);
+    // static subnet
+    MWOS_PARAM(14, subnet, PARAM_UINT8, PARAM_TYPE_OPTIONS, MWOS_STORAGE_EEPROM, 4);
+    // static dns
+    MWOS_PARAM(15, dns, PARAM_UINT8, PARAM_TYPE_OPTIONS, MWOS_STORAGE_EEPROM, 4);
+    // сетевое имя контроллера (справочная информация)
+    MWOS_PARAM(16, name, PARAM_STRING, PARAM_TYPE_OPTIONS, MWOS_STORAGE_NVS, 50);
 
-    // количество неудачных подключений, до попытки получения нового адреса
-    MWOS_PARAM(1, reconnectCount, mwos_param_uint8, mwos_param_option, mwos_param_storage_eeprom, 1);
-    MWOS_PARAM(2, ip4, mwos_param_uint32, mwos_param_option, mwos_param_storage_eeprom, 1);
-    MWOS_PARAM(3, ipPort, mwos_param_uint16, mwos_param_option, mwos_param_storage_eeprom, 1);
-
-    MWOSNetIP() : MWOSNetDevice() {
-        AddParam(&p_reconnectCount);
-        AddParam(&p_ip4);
-        AddParam(&p_ipPort);
+    /**
+     * Инициализация сетевого модуля. Можно задать сразу или позже _stream и sendPacket.init(). Если задать буфер (или только размер), то он будет пополам поделен на прием и передачу.
+     * @param stream        Ввод/вывод
+     * @param sizeBuffer    Суммарный размер буфера приема и передачи. Обязательно - четный, что-бы ровно поделить пополам.
+     * @param buffer        Внешний буфер приема и передачи, если не задан - будет создан в куче
+     */
+    MWOSNetIP(void * stream=nullptr, uint16_t sizeBuffer=0, uint8_t * buffer=nullptr) : MWOSNet(stream,sizeBuffer,buffer) {
     }
 
-    virtual void onInit() {
-        MWOSNetDevice::onInit();
-        reconnectCount=loadValue(2,&p_reconnectCount,0);
-        if (reconnectCount==0 || reconnectCount>200) reconnectCount=3;
-        ip4=loadValue(0xffffffff,&p_ip4,0);
-        ipPort=loadValue(MWOS_SERVER_PORT,&p_ipPort,0);
-        if (ipPort<80 || ipPort==0xffff) ipPort=MWOS_SERVER_PORT;
-        reconnectStep=0xff; // начать подключение с начала списка
+    /***
+     * Вызывается на многие системные события и каждый тик операционной системы.
+     * Так же, вызывается при запросе значений и приходе новых данных.
+     * @param modeEvent    Тип вызываемого системного события
+     * @param data    Данные, передаваемые в событие, и возвращаемые из события (просто изменить data)
+     */
+    virtual void onEvent(MWOSModeEvent modeEvent, MWValue &data) {
+        if (modeEvent==EVENT_INIT) { // инициализация
+            loadValueString(CNM, p_name,-1); // зададим имя сети по умолчанию
+        }
+        MWOSNet::onEvent(modeEvent,data);
     }
 
-    virtual void onConnect() {
-        MWOSNetDevice::onConnect();
-        reconnectStep=0xff; // начать подключение с начала списка
-    }
+    virtual void onConnectChange(MWOSConnectCode connectCode) {
+        if (connectCode>=CONNECT_COMMAND) {
 
-    virtual void connectToServer() { // начать подключение к серверу
-        reconnectStep++;
-#ifndef MWOS_NOT_RECONNECT_URLS
-        if (reconnectStep>reconnectCount+3) reconnectStep=0;
-#else
-        if (reconnectStep>reconnectCount) reconnectStep=0;
-#endif
-        if (reconnectStep<reconnectCount) {
-            if (ipPort==0 || ipPort==0xffffffff) {
-                connectAsync(IPAddress(ip4)); // подключимся к сокет-серверу из параметра
-            } else {
-                connectAsync(MWOS_SERVER_HOST); // подключимся к сокет-серверу по умолчанию
-            }
         } else {
-#ifndef MWOS_NOT_RECONNECT_URLS
-            if (reconnectStep==reconnectCount+1) {
-                char server_url[strlen_P(server_url1) + 1];
-                strcpy_P(server_url, server_url1);
-                connectAsync(server_url); // подключимся к сокет-серверу voscom.online
-            } else
-            if (reconnectStep==reconnectCount+2) {
-                char server_url[strlen_P(server_url2) + 1];
-                strcpy_P(server_url, server_url2);
-                connectAsync(server_url); // подключимся к сокет-серверу
-            } else
-            if (reconnectStep==reconnectCount+3) {
-                char server_url[strlen_P(server_url3) + 1];
-                strcpy_P(server_url, server_url3);
-                connectAsync(server_url); // подключимся к сокет-серверу
-            } else
-#endif
-            {
-                char server_url[strlen_P(server_url1) + 1];
-                strcpy_P(server_url, server_url1);
-                connectAsync(MWOS_SERVER_HOST); // подключимся к сокет-серверу по умолчанию
+            if (_stream) { // разорвем соединение, чтобы начать его заново
+                ((Client *)_stream)->stop();
             }
         }
+        MWOSNet::onConnectChange(connectCode);
+    }
 
-        connect_timeout.start(50); // следующая попытка только через 5 сек
-        MWOSNetDevice::connectToServer();
+    /**
+     * Вызывается, если connect_timeout закончился или остановлен.
+     * В потомках можно делать дополнительное действия и задавать свои connect_timeout
+     */
+    virtual void NetStep() {
+        switch (connectedStep) {
+            case STEP_SERVER_CONNECT: connectToServerClient(); break;
+        }
+        MWOSNet::NetStep();
+    }
+
+    void connectToServerClient() {
+        // начать подключение к серверу
+#ifdef MWOS_SERVER_HOST1
+        if (reconnectServerStep==4) {
+            char server_url[strlen_P(server_url1) + 1];
+            strcpy_P(server_url, server_url1);
+            connectAsync(server_url); // подключимся к сокет-серверу voscom.online
+        } else
+#endif
+#ifdef MWOS_SERVER_HOST2
+        if (reconnectServerStep==5) {
+            char server_url[strlen_P(server_url2) + 1];
+            strcpy_P(server_url, server_url2);
+            connectAsync(server_url); // подключимся к сокет-серверу voscom.online
+        } else
+#endif
+#ifdef MWOS_SERVER_HOST3
+        if (reconnectServerStep==6) {
+            char server_url[strlen_P(server_url3) + 1];
+            strcpy_P(server_url, server_url3);
+            connectAsync(server_url); // подключимся к сокет-серверу voscom.online
+        } else
+#endif
+        {
+            connectAsync(MWOS_SERVER_HOST); // подключимся к сокет-серверу по умолчанию
+        }
+    }
+
+    bool IsStaticIP() {
+#ifdef STATIC_IP
+        uint8_t dhcp = loadValueInt(1, &p_dhcp, 0);
+#else
+        uint8_t dhcp = loadValueInt(0, p_dhcp, 0);
+#endif
+        return dhcp>0;
+    }
+
+    IPAddress getStaticAddr(MWOSParam * param, IPAddress defIP) {
+        IPAddress staticIP(loadValueInt(defIP[0], *param, 0), loadValueInt(defIP[1], *param, 1), loadValueInt(defIP[2], *param, 2), loadValueInt(defIP[3], *param, 3));
+        return staticIP;
+    }
+
+    IPAddress getStaticIP() {
+#ifdef STATIC_IP
+        IPAddress defStaticIP(STATIC_IP);
+#else
+        IPAddress defStaticIP({0,0,0,0});
+#endif
+        return getStaticAddr(&p_staticIP,defStaticIP);
+    }
+
+    IPAddress getStaticGateway() {
+#ifdef STATIC_GATEWAY
+        IPAddress defStaticIP(STATIC_GATEWAY);
+#else
+#ifdef STATIC_IP
+        IPAddress defStaticIP(STATIC_IP);
+        defStaticIP[3]=1;
+#else
+        IPAddress defStaticIP({0,0,0,0});
+#endif
+#endif
+        return getStaticAddr(&p_gateway,defStaticIP);
+    }
+
+    IPAddress getStaticDNS() {
+#ifdef STATIC_DNS
+        IPAddress defStaticIP(STATIC_DNS);
+#else
+#ifdef STATIC_IP
+        IPAddress defStaticIP(STATIC_IP);
+        defStaticIP[3]=1;
+#else
+        IPAddress defStaticIP({0,0,0,0});
+#endif
+#endif
+        return getStaticAddr(&p_dns,defStaticIP);
+    }
+
+    IPAddress getStaticSubnet() {
+#ifdef STATIC_SUBNET
+        IPAddress defStaticIP(STATIC_SUBNET);
+#else
+        IPAddress defStaticIP({255,255,255,0});
+#endif
+        return getStaticAddr(&p_subnet,defStaticIP);
     }
 
     void connectAsync(const char *server_url){
+#if (LOG_NET>1)
         MW_LOG_MODULE(this); MW_LOG(F("Connect to server url step: "));
-        ((Client *) _stream)->connect(server_url,ipPort); // подключимся к сокет-серверу
-        MW_LOG(reconnectStep); MW_LOG('>'); MW_LOG(server_url); MW_LOG(':'); MW_LOG_LN(ipPort);
+#endif
+        ((Client *) _stream)->connect(server_url,MWOS_SERVER_PORT); // подключимся к сокет-серверу
+#if (LOG_NET>1)
+        MW_LOG(reconnectServerStep); MW_LOG('>'); MW_LOG(server_url); MW_LOG(':'); MW_LOG_LN(MWOS_SERVER_PORT);
+#endif
     }
 
     void connectAsync(IPAddress ip){
+#if (LOG_NET>1)
         MW_LOG_MODULE(this); MW_LOG(F("Connect to server ip step: "));
-        ((Client *) _stream)->connect(ip,ipPort); // подключимся к сокет-серверу
-        MW_LOG(reconnectStep); MW_LOG('>'); MW_LOG(ip); MW_LOG(':'); MW_LOG_LN(ipPort);
+#endif
+        ((Client *) _stream)->connect(ip,MWOS_SERVER_PORT); // подключимся к сокет-серверу
+#if (LOG_NET>1)
+        MW_LOG(reconnectServerStep); MW_LOG('>'); MW_LOG(ip); MW_LOG(':'); MW_LOG_LN(MWOS_SERVER_PORT);
+#endif
     }
 
-    virtual bool isConnectedServer(bool firstTime) { // есть подключение к серверу?
-        return ((Client *) _stream)->connected();
-    }
-
-    virtual void onDisconnect() {
-        if (_stream!=NULL) { // разорвем соединение, чтобы начать его заново
-            ((Client *)_stream)->stop();
-            //delete _stream;
-            //_stream=NULL;
-            MW_LOG_MODULE(this); MW_LOG(F("disconnect step:"));  MW_LOG(reconnectStep); MW_DEBUG_LOG_MEM(false);
-        }
-        MWOSNetDevice::onDisconnect();
+    virtual bool isConnected(bool toServer) { // есть подключение к серверу?
+        if (toServer) return ((Client *) _stream)->connected();
+        return MWOSNet::isConnected(toServer);
     }
 
 };

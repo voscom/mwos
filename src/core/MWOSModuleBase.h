@@ -4,33 +4,18 @@
  * Базовый класс модулей
  * Модули модут перехватывать следующие события
  *
- * onInit() - инициализация системы, после старта или глубокого сна (все модули уже созданы)
- *
- * onUpdate() - вызывается каждый тик системы. модуль сам должен следить, чтобы как можно быстрее обработать это событие
- *
- * onReciveStart(uint16_t paramNum, uint16_t blockSize) - начало приема блока данных для параметра (типа байтового массива) этого модуля
- * onRecive(uint8_t reciveByte, uint16_t offset) - прием очередного (offset) байта, начатого в onReciveStart
- * onReciveStop(uint16_t paramNum, uint16_t blockSize, int8_t errorCode) - окончание приема блока данных.
- * Если errorCode не 0, то была ошибка в данных. Необходимо проигнорировать принятый с ошибкой блок!
+ * onEvent() - вызывается на кождое событие и каждый тик системы. модуль сам должен следить, чтобы как можно быстрее обработать это событие
  *
  * int64_t getValue(uint16_t paramNum, int64_t value, int16_t arrayIndex) - запрошено значение параметра.
  * Вызывается после чтения значения параметра из хранилища. Можно изменить отправляемое значение.
  *
- * int64_t setValue(uint16_t paramNum, int64_t value, int16_t arrayIndex=0) - принято значение параметра.
+ * void onReceiveValue(MWOSNetReceiverFields * receiverDat) - принято значение параметра.
  * Вызывается перед сохранением значения в хранилище (если оно задано). Можно изменить сохраняемое значение.
  *
- * Принцип вызова событий изменения параметров:
- * Отправка данных параметру. Если тип параметра байтовый массив:
- * 1. Вызывается onReciveStart
- * 2. Побайтно для всего блока передаваемых данных, вызывается onRecive
- * 3. После передаси всего блока данных вызывается onReciveStop. Если код ошибки не 0, то надо считать переданные данные сбойными
- * Отправка данных параметру. Если тип параметра не байтовый массив:
- * Вызывается setValue для нового значения параметра.
- * Если значение парамера массив, то для каждого переданного значения массива вызывается setValue
  *
  */
 
-#include <core/net/MWOSNetReciverFields.h>
+#include <core/MWValue.h>
 #include "MWOSParam.h"
 #include "MWOSUnit.h"
 
@@ -38,18 +23,13 @@
 #include "MWOSParent.h"
 #include "core/adlib/MWBitsMask.h"
 
+int64_t MWOSModuleBase_return_result_value=0;
 
 /***
  * Интерфейс модуля
  */
 class MWOSModuleBase : public MWOSParent {
 public:
-
-#pragma pack(push,1)
-    MWOS_PARAM_UINT paramsCount=0; // общее количество параметров модуля
-    MWBitsMask changedMask; // битовая маска для признаков изменения значений параметров (размер выделяется автоматом до onInit) // TODO: Надо перенести изменения параметров в модуль связи
-#pragma pack(pop)
-
 
     MWOSModuleBase(char * unit_name, uint16_t unit_id=0) : MWOSParent(unit_name,unit_id) {
         unitType=MODULE;
@@ -59,9 +39,8 @@ public:
      * Добавить модулю новый параметр
      * @param param
      */
-    bool AddParam(MWOSParam * param) {
-        bool res=AddChild(param);
-        if (res) paramsCount++;
+    bool AddParam(const MWOSParam &param) {
+        bool res=AddChild((MWOSUnit *) &param);
         return res;
     }
 
@@ -70,132 +49,133 @@ public:
     }
 
     /***
-     * Установить/снять признак необходимости отправки этого параметра на сервер
-     * @param param_id  id параметра
-     * @param arrayIndex Номер в массиве параметров (если FFFF - все параметры)
-     * @param changed  Установить/снять
+     * Установить/снять признак необходимости отправки значения этого параметра на сервер
+     * @param param_id  id параметра (если UINT16_MAX - все параметры)
+     * @param arrayIndex Не используется!
+     * @param changedV   0=снять, 1=Установить, 2=установить для всех, у кого установлено sended или changed (только для param_id=UINT16_MAX)
+     * @param onlyControl  Только для параметров управления
+     * @return  Количество измененных параметров
      */
-    void SetParamChangedByParamId(uint16_t param_id, uint16_t arrayIndex, bool changed) {
-        uint32_t res=0;
+    uint16_t SetParamChangedByParamId(uint16_t param_id, uint16_t arrayIndex=UINT16_MAX, uint8_t changedV=1, bool onlyControl=false) {
         MWOSParam * paramNow=(MWOSParam *) child;
-        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
+        bool changedNow=changedV>0;
+        uint16_t res=0;
+        while (paramNow && paramNow->unitType==UnitType::PARAM) {
+            if (changedV>1) changedNow=paramNow->sended || paramNow->changed;
             if (paramNow->id==param_id) {
-                if (arrayIndex==UINT16_MAX) { // все параметры
-                    for (MWOS_PARAM_INDEX_UINT i = 0; i < paramNow->arrayCount(); i++) {
-                        changedMask.setBit(changed,res+i);
-                    }
-                } else
-                    changedMask.setBit(changed,res+arrayIndex);
-                return;
+                if (paramNow->changed!=changedNow) {
+                    paramNow->changed=changedNow;
+                    paramNow->sended=!changedNow;
+                    res++;
+                }
+                return res;
+            } else
+            if (param_id==UINT16_MAX && (!onlyControl || paramNow->IsParamControl())) {
+                if (paramNow->changed!=changedNow) {
+                    paramNow->changed=changedNow;
+                    paramNow->sended=!changedNow;
+                    res++;
+                }
             }
-            res+=paramNow->arrayCount();
             paramNow=(MWOSParam *) paramNow->next;
         }
+        return res;
     }
 
-    void SetParamChanged(MWOSParam * param, uint16_t arrayIndex, bool changed) {
-        uint32_t res=0;
+    /**
+    * Установить/снять признак необходимости отправки формата этого параметра на сервер.
+     * @param sendInfNow  0=снять, 1=Установить
+     * @param param_id  id параметра (если UINT16_MAX - все параметры)
+     * @return
+     */
+    uint16_t SetParamSendInfByParamId(bool sendInfNow, uint16_t param_id=UINT16_MAX) {
         MWOSParam * paramNow=(MWOSParam *) child;
-        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
-            if (paramNow==param) {
-                if (arrayIndex==UINT16_MAX) { // все параметры
-                    for (MWOS_PARAM_INDEX_UINT i = 0; i < paramNow->arrayCount(); i++) {
-                        changedMask.setBit(changed,res+i);
-                    }
-                } else
-                    changedMask.setBit(changed,res+arrayIndex);
-                return;
+        uint16_t res=0;
+        while (paramNow && paramNow->unitType==UnitType::PARAM) {
+            if (paramNow->id==param_id || param_id==UINT16_MAX) {
+                paramNow->sendInf=sendInfNow;
+                res++;
             }
-            res+=paramNow->arrayCount();
             paramNow=(MWOSParam *) paramNow->next;
+        }
+        return res;
+    }
+
+    /**
+     * Установить/снять признак необходимости отправки этого параметра на сервер
+     * @param param         Параметр (или nullptr - все параметры)
+     * @param arrayIndex Не используется!
+     * @param changed   Установить/снять
+     */
+    void SetParamChanged(MWOSParam * param, uint16_t arrayIndex=UINT16_MAX, bool changed=true) {
+        if (!param) SetParamChangedByParamId(UINT16_MAX,changed);
+        else {
+            if ( param->changed!=changed) {
+                param->sended=!changed;
+                param->changed=changed;
+            }
         }
     }
 
     /**
      * Необходима отправка значения этого параметра на сервер?
      * @param param_id id параметра
-     * @param arrayIndex Номер значения
+     * @param arrayIndex Не используется!
      * @return  true - необходима отправка
      */
-    bool IsParamChangedByParamId(uint16_t param_id, uint16_t arrayIndex) {
-        int32_t res=0;
-        MWOSParam * paramNow=(MWOSParam *) child;
-        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
-            if (paramNow->id==param_id) {
-                return changedMask.getBit(res+arrayIndex);
-            }
-            res+=paramNow->arrayCount();
-            paramNow=(MWOSParam *) paramNow->next;
-        }
-        return false;
+    bool IsParamChangedByParamId(uint16_t param_id, uint16_t arrayIndex=0) {
+        return IsParamChanged((MWOSParam *) FindChildById(param_id));
     }
 
     /**
      * Необходима отправка значения этого параметра на сервер?
      * @param param параметр
-     * @param arrayIndex Номер значения
+     * @param arrayIndex Не используется!
      * @return  true - необходима отправка
      */
-    bool IsParamChanged(MWOSParam * param, uint16_t arrayIndex) {
-        int32_t res=0;
-        MWOSParam * paramNow=(MWOSParam *) child;
-        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
-            if (paramNow==param) {
-                return changedMask.getBit(res+arrayIndex);
-            }
-            res+=paramNow->arrayCount();
-            paramNow=(MWOSParam *) paramNow->next;
-        }
+    bool IsParamChanged(MWOSParam * param, uint16_t arrayIndex=0) {
+        if (param) return param->changed;
         return false;
     }
 
-    /**
-     * Необходима отправка всех значений этого параметра на сервер?
-     * @param param параметр
-     * @return  true - необходима отправка
-     */
-    bool IsParamAllChanged(MWOSParam * param) {
-        int32_t res=0;
-        MWOSParam * paramNow=(MWOSParam *) child;
-        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
-            if (paramNow==param) {
-                for (int i = 0; i < paramNow->arrayCount(); ++i) {
-                    if (!changedMask.getBit(res+i)) return false;
-                }
-                return true;
-            }
-            res+=paramNow->arrayCount();
-            paramNow=(MWOSParam *) paramNow->next;
-        }
+    bool IsParamSendedByParamId(uint16_t param_id, uint16_t arrayIndex=0) {
+        return IsParamSended((MWOSParam *) FindChildById(param_id));
+    }
+
+    bool IsParamSended(MWOSParam * param) {
+        if (param) return param->sended;
         return false;
     }
 
     /***
      * Ищет параметр, где используется этот пин
      * @param pinNum    номер пина
-     * @return  параметр или NULL
+     * @return  параметр или nullptr
      */
     MWOSParam * FindByPin(MWOS_PIN_INT pinNum) {
         MWOSParam * paramNow=(MWOSParam *) child;
-        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
-            if (paramNow->IsGroup(mwos_param_pin)) {
+        while (paramNow && paramNow->unitType==UnitType::PARAM) {
+            if (paramNow->IsGroup(PARAM_TYPE_PIN)) {
                 for (MWOS_PARAM_INDEX_UINT i = 0; i < paramNow->arrayCount(); i++) {
-                    if (getValue(paramNow,i)==pinNum) return paramNow;
+                    if (getValue((int64_t) -1,paramNow,i)==pinNum) return paramNow;
                 }
             }
             paramNow=(MWOSParam *) paramNow->next;
         }
-        return NULL;
+        return nullptr;
     }
 
-    /***
-     * @return Общее количество всех значений всех параметров этого модуля
-     */
-    int32_t GetParamValuesCount() {
-        int32_t res=0;
+     /**
+      * Статистика по параметрам
+      * @param storageType  Количество всех значений параметров модуля (false - просто количество параметров модуля)
+      * @return     Общее количество всех значений всех параметров этого модуля
+      */
+    uint32_t GetParamCount(bool getValuesCount) {
+        uint32_t res=0;
         MWOSParam * param=(MWOSParam *) child;
-        while (param!=NULL && param->unitType==UnitType::PARAM) {
-            res+=param->arrayCount();
+        while (param && param->unitType==UnitType::PARAM) {
+            if (getValuesCount) res+=param->indexCount();
+            else res++;
             param=(MWOSParam *) param->next;
         }
         return res;
@@ -203,19 +183,15 @@ public:
 
     /***
      * Общий битовый размер всех параметров модуля для заданного типа хранилища
-     * @param storageType
-     * @return
-     */
-    int32_t bitsSize(int8_t storageType) {
+      * @param storageType  По хранилищам
+      * @param IsParamBit   Отдельно для битовых и для байтовых параметров
+      * @return
+      */
+    int32_t paramsBitsSize(int8_t storageType, bool IsParamBit) {
         int32_t bitSize=0;
         MWOSParam * param=(MWOSParam *) child;
-        while (param!=NULL && param->unitType==UnitType::PARAM) {
-            if (param->storage==storageType) {
-                if ((bitSize & 7) > 0 && param->IsBytes()) { // если это не битовый параметр - выравнивание по байту
-                    int32_t byteSize=bitSize >> 3;
-                    byteSize++;
-                    bitSize=byteSize << 3;
-                }
+        while (param && param->unitType==UnitType::PARAM) {
+            if (param->IsStorage(storageType) && (param->IsBit()==IsParamBit)) {
                 bitSize+=param->bitsSize(true);
             }
             param=(MWOSParam *) param->next;
@@ -223,22 +199,20 @@ public:
         return bitSize;
     }
 
-    /***
+    /**
      * Рассчитать битовое смещение параметра для этого типа хранилища. От начала хранилища для этого модуля.
-     * @param paramNum
+     * Смещение битовых параметров рассчитываются отдельно.
+     * @param param             Параметр
+     * @param moduleBitOffset   Битовое смещение параметра, относительно модуля
      * @return
      */
-    int32_t getParamBitOffset(MWOSParam * param,int32_t moduleBitOffset) {
-        int32_t bitOffset=moduleBitOffset;
-        int8_t storageType=param->storage;
+    int32_t getParamBitsOffset(MWOSParam * param) {
+        int32_t bitOffset=0;
+        int8_t storageType=param->getStorage();
+        bool IsParamBit=param->IsBit();
         MWOSParam * paramNow=(MWOSParam *) child;
-        while (paramNow!=NULL && paramNow->unitType==UnitType::PARAM) {
-            if (paramNow->storage==storageType) {
-                if ((bitOffset & 7)>0 && paramNow->IsBytes()) { // если это не битовый параметр - выравнивание по байту
-                    int32_t byteOffset=bitOffset >> 3;
-                    byteOffset++;
-                    bitOffset=byteOffset << 3;
-                }
+        while (paramNow && paramNow->unitType==UnitType::PARAM) {
+            if (paramNow->IsStorage(storageType) && (paramNow->IsBit()==IsParamBit)) { // отдельно по хранилищам и отдельно битовые параметры
                 if (param==paramNow) return bitOffset;
                 bitOffset+=paramNow->bitsSize(true);
             }
@@ -247,73 +221,127 @@ public:
         return 0;
     }
 
-    /***
-     * Вызывается автоматом после загрузки значений в параметры
-     * после включения и перезагрузки вызывается сразу после onFirstInit
-     */
-    virtual void onInit() {
+    void setValueByParamId(const String &v, MWOS_PARAM_UINT paramId, int16_t arrayIndex) {
+        setValue(v,getParam(paramId),arrayIndex);
+    }
+
+    void setValueByParamId(const double v, MWOS_PARAM_UINT paramId, int16_t arrayIndex) {
+        setValue(v,getParam(paramId),arrayIndex);
+    }
+
+    void setValueByParamId(const int64_t v, MWOS_PARAM_UINT paramId, int16_t arrayIndex) {
+        setValue(v,getParam(paramId),arrayIndex);
+    }
+
+    void setValue(MWValue &data) {
+        onEvent(EVENT_SET_VALUE,data);
     }
 
     /***
-     * Вызывается каждый тик операционной системы
+     * Установить значение и вызвать для него onReceiveValue
+     * @param v
+     * @param param
+     * @param arrayIndex
      */
-    virtual void onUpdate() {
-
+    void setValue(const int64_t v, MWOSParam * param, int16_t arrayIndex) {
+        if (!param) return;
+        MWValue data;
+        data.setValueInt(v,param->valueType);
+        data.param_id=param->id;
+        data.module_id=id;
+        data.param_index=arrayIndex;
+        onEvent(EVENT_SET_VALUE,data);
     }
 
-    /***
-     * Получена команда для параметра. Вызывается автоматически при получении новой команды или значения по модулю связи
-     * Для блока данных без буфферизации - вызывает сначала команду mwos_server_cmd_param_start_block, потом для каждого байта блока,
-     * и в конце mwos_server_cmd_param_stop_block или mwos_server_cmd_param_error_block
-     * @param reciverDat   Полученные данные со структурой
-     * @return Если команда обработана нормально
-     */
-    virtual bool onReciveCmd(MWOSProtocolCommand cmd, MWOSNetReciverFields * reciverDat) {
-        switch (cmd) {
-            case mwos_server_cmd_param_set_value: // не сохранять по месту хранения
-                setValueByParamID(reciverDat->reciveValue,reciverDat->param_id,reciverDat->array_index);
-                SetParamChangedByParamId(reciverDat->param_id, reciverDat->array_index, true);
-                return true;
-            case mwos_server_cmd_param_get_value: // запросили значение параметра
-                SetParamChangedByParamId(reciverDat->param_id, reciverDat->array_index, true);
-                return true;
-            case mwos_server_cmd_param_get_param: // запросили данные всего параметра
-                SetParamChangedByParamId(reciverDat->param_id, UINT16_MAX, true); // отправить все значения
-                return true;
-            default: return false;
-        }
-        return false;
+    void setValue(const String &vs, MWOSParam * param, int16_t arrayIndex) {
+        if (!param) return;
+        MWValue data;
+        data.setString(vs.c_str());
+        data.param_id=param->id;
+        data.module_id=id;
+        data.param_index=arrayIndex;
+        onEvent(EVENT_SET_VALUE,data);
     }
 
-    void setValueByParamID(int64_t value, int16_t paramId, int16_t arrayIndex=0) {
-        setValue(value, getParam(paramId), arrayIndex);
+    void setValue(const double vf, MWOSParam * param, int16_t arrayIndex) {
+        if (!param) return;
+        MWValue data;
+        data.setValueDouble(vf,param->valueType);
+        data.param_id=param->id;
+        data.module_id=id;
+        data.param_index=arrayIndex;
+        onEvent(EVENT_SET_VALUE,data);
     }
 
-     int64_t getValueByParamID(int16_t paramId, int16_t arrayIndex=0) {
-        return getValue(getParam(paramId), arrayIndex);
+    String getValueByParamId(const String &def, MWOS_PARAM_UINT paramId, int16_t arrayIndex) {
+        return getValue(def,getParam(paramId),arrayIndex);
+    }
+
+    double getValueByParamId(const double def, MWOS_PARAM_UINT paramId, int16_t arrayIndex) {
+        return getValue(def,getParam(paramId),arrayIndex);
+    }
+
+    int64_t getValueByParamId(const int64_t def, MWOS_PARAM_UINT paramId, int16_t arrayIndex) {
+        return getValue(def,getParam(paramId),arrayIndex);
     }
 
     /**
-     * Вызывается при запросе значения параметра
-     * @param paramNum  Номер параметра
-     * @param arrayIndex Номер индекса в массиве значений параметра (если это массив)
-     * @return  Значение
+     * Запросить значение параметра в data. Адрес тоже в data.
+     * @param data      Адрес параметра и место для возврата значения.
+     * @param param     Полезно для оптимизации. Но если не передавать, то найдет само.
      */
-    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
-        return 0;
+    void getValue(MWValue &data, MWOSParam * param=nullptr) {
+        if (!param) {
+            if (data.param_id==UINT16_MAX) return;
+            param=getParam(data.param_id);
+            if (!param) return;
+        } else data.param_id=param->id;
+        data.type=param->valueType;
+        data.module_id=id;
+        onEvent(EVENT_GET_VALUE,data);
+    }
+
+    String getValue(const String &def, MWOSParam * param, int16_t arrayIndex) {
+        if (!param) return def;
+        MWValue data;
+        data.setString(def.c_str());
+        data.module_id=this->id;
+        data.param_id=param->id;
+        data.param_index=arrayIndex;
+        onEvent(EVENT_GET_VALUE,data);
+        return data.toString();
+    }
+
+    double getValue(const double def, MWOSParam * param, int16_t arrayIndex) {
+        if (!param) return def;
+        MWValue data;
+        data.setValueDouble(def,param->valueType);
+        data.module_id=this->id;
+        data.param_id=param->id;
+        data.param_index=arrayIndex;
+        onEvent(EVENT_GET_VALUE,data);
+        return data.toDouble();
+    }
+
+    int64_t getValue(const int64_t def, MWOSParam * param, int16_t arrayIndex) {
+        if (!param) return def;
+        MWValue data;
+        data.setValueInt(def,param->valueType);
+        data.module_id=this->id;
+        data.param_id=param->id;
+        data.param_index=arrayIndex;
+        onEvent(EVENT_GET_VALUE,data);
+        return data.toInt();
     }
 
     /***
-     * Вызывается при изменении параметра
-     * @param value     Значение для изменения
-     * @param param     параметр
-     * @param arrayIndex Номер индекса в массиве значений параметра (если это массив)
+     * Вызывается на многие системные события и каждый тик операционной системы.
+     * Так же, вызывается при запросе значений и приходе новых данных.
+     * @param modeEvent    Тип вызываемого системного события
+     * @param data    Данные, передаваемые в событие, и возвращаемые из события (просто изменить data)
      */
-    virtual void setValue(int64_t value, MWOSParam * param, int16_t arrayIndex) {
+    virtual void onEvent(MWOSModeEvent modeEvent, MWValue &data) {
     }
-
-
-
 
 };
 

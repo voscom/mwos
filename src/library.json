@@ -1,0 +1,35 @@
+{
+  "name": "mwos",
+  "version": "3.5.260413",
+  "description": "Modular operating system for IoT microcontrollers. Enables remote monitoring and control of devices via unified web interface and cross-platform app. Module-based architecture lets you focus on device logic while MWOS handles networking, web server, settings storage, communication protocols, and cloud sync.",
+  "keywords": [
+    "iot",
+    "os",
+    "modular",
+    "esp32",
+    "esp8266",
+    "stm32",
+    "avr",
+    "web",
+    "monitoring",
+    "mwscript",
+    "arduino",
+    "remote-control"
+  ],
+  "homepage": "https://github.com/voscom/mwos",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/voscom/mwos.git"
+  },
+  "authors": [
+    {
+      "name": "Vladimir M.",
+      "email": "vladimir9@bk.ru",
+      "url": "https://github.com/voscom",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino"],
+  "platforms": ["*"]
+ }

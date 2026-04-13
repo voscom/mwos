@@ -53,30 +53,23 @@ public:
      */
     MWOSPinsMCP23017(TwoWire * twoWire, uint8_t devHardwareAddress, int16_t _firstPin=0) : MWOSPins() {
         firstPin=_firstPin;
+        lastPin=_firstPin+15;
 //        /i2c=new MWStreamI2C();
         i2c->begin(twoWire,MCP23017_ADDRESS+devHardwareAddress,I2C_8bit);
     }
 
     /**
-     * Возвращает количество портов на текущей микросхемме
+     * Задать режим порта (вход, выход, подтяжка...)
+     * @param pinMode   Режим порта
+     * @return Успешно, или нет
      */
-    virtual uint8_t getCount() {
-        return 16;
-    }
-
-    /**
-     * Задать режим на вход или на выход
-     * и подтяжку, если нужно
-     * @param	outPort	настройить порт на выход (false - на вход)
-     * @param   pull тип подтяжки порта (0-нет, 1-на 0, 2-на питание, 3 - на выход открытый коллектор, на вход - аналоговый)
-     */
-    virtual bool mode(bool outPort, uint8_t pull) {
+    virtual bool mode(MW_PIN_MODE mode) {
         uint16_t outPorts=0;
         readRegister((uint8_t *) &outPorts,MCP23017_IODIRA); // читаем в outPorts текущее состояние
-        writeRegister((uint8_t *) &outPorts,MCP23017_IODIRA,!outPort); // установим ввод-вывод
+        writeRegister((uint8_t *) &outPorts,MCP23017_IODIRA,mode<MW_PIN_EVENT_OUTPUT); // установим ввод-вывод
         uint16_t outPull=0;
         readRegister((uint8_t *) &outPull,MCP23017_GPPUA); // читаем в outPull текущее состояние
-        writeRegister((uint8_t *) &outPull,MCP23017_GPPUA,pull==2); // установим подтяжку (только вверх)
+        writeRegister((uint8_t *) &outPull,MCP23017_GPPUA,mode==MW_PIN_EVENT_INPUT_PULLUP); // установим подтяжку (только вверх)
         uint16_t outIPOL=0;
         readRegister((uint8_t *) &outIPOL,MCP23017_IPOLA); // читаем в outIPOL текущее состояние
         writeRegister((uint8_t *) &outIPOL,MCP23017_IPOLA,LOW);
@@ -86,19 +79,11 @@ public:
         return true;
     }
 
-    virtual bool isPWM() {
-        return false;
-    }
-
-    virtual bool isADC() {
-        return false;
-    }
-
-    virtual bool writeDigital(bool dat) {
+    virtual bool write(bool dat) {
         return writeRegister((uint8_t *) &nowValue,MCP23017_GPIOA,dat);
     }
 
-    virtual bool readDigital() {
+    virtual bool read() {
         return readRegister((uint8_t *) &nowValue,MCP23017_GPIOA);
     }
 
@@ -133,7 +118,7 @@ private:
      */
     bool readRegister(uint8_t * word, uint8_t firstReg) {
         uint8_t pinLocal=pin-firstPin;
-        if (pinLocal>=getCount()) pinLocal=getCount()-1;
+        if (pinLocal>lastPin) pinLocal=lastPin;
         uint8_t reg=firstReg;
         uint8_t i=0;
         if (pinLocal>7) {

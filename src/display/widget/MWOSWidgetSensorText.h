@@ -3,82 +3,85 @@
 //
 // Виджет дисплея MWOS
 //
-#include <Adafruit_GFX.h>
-#include "MWOSWidgetText.h"
+#include "MWOSWidgetTextValue.h"
+#include "../../core/MWOSLinkToValue.h"
 
-class MWOSWidgetSensorText: public MWOSWidgetText {
+#ifndef MWOSWidgetSensor_UPDATE_TIMEOUT_DSEC
+#define MWOSWidgetSensor_UPDATE_TIMEOUT_DSEC 3 // [сек/10] таймаут обновления значений
+#endif
+/**
+ * Виджет показывает текст на экране
+ * Доп.шрифты тут:
+ * https://github.com/immortalserg/AdafruitGFXRusFonts
+ *
+ * @tparam stringLength    Максимальный размер строки
+ */
+template<MWOS_PARAM_INDEX_UINT stringLength>
+class MWOSWidgetSensorText: public MWOSWidgetTextValue<stringLength> {
 public:
 
 #pragma pack(push,1)
-    MWOSModuleBase * _sensor;
-    MWOSParam * sensorParam;
-    MWOS_PARAM_UINT _sensor_id;
-    MWOS_PARAM_INDEX_UINT _sensorIndex;
+    uint8_t _digits=0;
     MWTimeout timeout;
-    int64_t lastSensorValue=INT64_MIN;
 #pragma pack(pop)
 
-    // id модуля аналогового датчика
-    MWOS_PARAM(20, sensorModuleId, MWOS_PARAM_UINT_PTYPE, mwos_param_option, mwos_param_storage_eeprom, 1);
-    // индекс параметра
-    MWOS_PARAM(21, sensorIndex, MWOS_PARAM_INDEX_UINT_PTYPE, mwos_param_option, mwos_param_storage_eeprom, 1);
+    // количество знаков после запятой
+    MWOS_PARAM(21, digits, mwos_param_uint8, mwos_param_option, MWOS_STORAGE_EEPROM, 1);
 
-    MWOSWidgetSensorText(MWOSDisplay * _displayModule) : MWOSWidgetText(_displayModule) {
-        name=(char *) F("widgetSensorText");
-        AddParam(&p_sensorModuleId);
-        AddParam(&p_sensorIndex);
-    }
+    // добавим параметры и методы линковки на значения другого параметра в другом модуле
+    MWOS_PARAMS_LINK_TO_MODULE_PARAM_VALUE(22,23,24,1);
 
-    virtual void onInit() {
-        _sensor=NULL;
-        _sensorIndex=MWOSWidgetText::loadValue(_sensorIndex, &p_sensorIndex, 0);
-        if (_sensorIndex<0) {
-            MW_LOG_MODULE(this); MW_LOG(F("error sensor index: ")); MW_LOG_LN(_sensorIndex);
-            return;
-        }
-        _sensor_id=MWOSWidgetText::loadValue(_sensor_id, &p_sensorModuleId, 0);
-        if (_sensor_id<2) {
-            MW_LOG_MODULE(this); MW_LOG(F("error sensor module id: ")); MW_LOG_LN(_sensor_id);
-            return;
-        }
-        _sensor=mwos.getModule(_sensor_id);
-        if (_sensor==NULL) {
-            MW_LOG_MODULE(this); MW_LOG(F("error sensor not found: ")); MW_LOG_LN(_sensor_id);
-            return;
-        }
-        sensorParam=_sensor->getParam(MWOS_SENSOR_ANALOG_PARAM_ID);
-        if (sensorParam==NULL || sensorParam->group!=mwos_param_readonly) { // любой другой тип, кроме ридонли
-            MW_LOG_MODULE(this); MW_LOG_LN(F("error param type!"));
-            sensorParam=NULL;
-            _sensor=NULL; // удалим не датчики
-            return;
-        }
-        MW_LOG_MODULE(this); MW_LOG_LN(F("onInited!"));
-        timeout.start(2);
-        MWOSWidgetText::onInit();
+
+    MWOSWidgetSensorText(MWOSDisplay * _displayModule) : MWOSWidgetTextValue<stringLength>(_displayModule) {
+        MWOSWidget::name=(char *) F("widgetSensorText");
+        MWOSModule::AddParam(&p_digits);
+        AddParamsLinkToValue();
     }
 
     /***
-     * Вызывается каждый тик операционной системы
+     * Вызывается на многие системные события и каждый тик операционной системы
+     * @param modeEvent    Тип вызываемого системного события
      */
-    virtual void onUpdate() {
-        if (_visible==0) return;
-        if (timeout.isTimeout()) {
-            if (_sensor!=NULL && _sensorIndex>=0) {
-                int64_t nowSensorValue=_sensor->getValue(sensorParam,_sensorIndex);
-                if (lastSensorValue!=nowSensorValue) {
-                    print(String(nowSensorValue));
-                    lastSensorValue=nowSensorValue;
+    virtual void onEvent(MWOSModeEvent modeEvent) {
+        MWOSWidgetTextValue<stringLength>::onEvent(modeEvent);
+        if (modeEvent==EVENT_INIT || modeEvent==EVENT_CHANGE) { // инициализация или изменение параметров
+            _digits = MWOSWidgetTextValue<stringLength>::loadValue(_digits, &p_digits, 0);
+            LoadParamsAllLinkToValue();
+            timeout.start(MWOSWidgetSensor_UPDATE_TIMEOUT_DSEC);
+        } else
+        if (modeEvent==EVENT_UPDATE) { // Вызывается каждый тик операционной системы
+            if (!MWOSWidgetTextValue<stringLength>::IsVisible()) return;
+            if (timeout.isTimeout()) {
+                if (GetValueParamLinkToValue(0)) {
+                    if (_linkToModuleParam[0]->IsFloat()) {
+                        MWOSWidgetTextValue<stringLength>::setValue(String(_linkToModuleParam[0]->valueToFloat(_linkParamValue[0]), (unsigned int) _digits));
+                    } else
+                    if (_digits>0) {
+                        if (_digits>15) _digits=15; // максимум - 15 знаков после запятой
+                        float floatSensorValue=_linkParamValue[0];
+                        for (uint8_t i = 0; i < _digits; ++i) floatSensorValue/=10.0;
+                        MWOSWidgetTextValue<stringLength>::setValue(String(floatSensorValue,(unsigned int) _digits));
+                    } else {
+                        MWOSWidgetTextValue<stringLength>::setValue(String(_linkParamValue[0]));
+                    }
                 }
+                timeout.start(MWOSWidgetSensor_UPDATE_TIMEOUT_DSEC);
             }
-            timeout.start(2);
         }
-        MWOSWidgetText::onUpdate();
     }
 
-    void setDefaultSensor(MWOSModuleBase * module, MWOS_PARAM_INDEX_UINT index) {
-        _sensor_id=module->id;
-        _sensorIndex=index;
+    virtual int64_t getValue(MWOSParam * param, int16_t arrayIndex) {
+        if (IsIdParamForLink(param->id)) return IdParamForLink(param->id,arrayIndex);
+        else
+        switch (param->id) {
+            case 21: return _digits;
+        }
+        return MWOSWidgetTextValue<stringLength>::getValue(param, arrayIndex); // отправим значение из EEPROM
+    }
+
+    void setDefaultParam(MWOSModuleBase * module, MWOS_PARAM_UINT paramId, MWOS_PARAM_INDEX_UINT index, uint8_t digits) {
+        setDefaultParamLinkToValue(0,module,paramId,index);
+        _digits=digits;
     }
 
 };

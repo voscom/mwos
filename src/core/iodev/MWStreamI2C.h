@@ -1,7 +1,7 @@
 #ifndef MWOS3_MWSTREAMI2C_H
 #define MWOS3_MWSTREAMI2C_H
 
-#include "MWStream.h"
+#include "MWStreamAddr.h"
 #include <Wire.h>
 
 enum I2C_DEVICE_TYPE:uint8_t {
@@ -15,7 +15,7 @@ enum I2C_DEVICE_TYPE:uint8_t {
  * Реализована адресация 8 и 16 бит
  * Автоматическое разделение больших блоков до _blockMaxSize
  */
-class MWStreamI2C : public MWStream {
+class MWStreamI2C : public MWStreamAddr {
 protected:
     TwoWire * _i2c; // на каком порту i2c подключено устройство
     int _device_address; // полный адрес устройства i2c (внутренний + заданный ножками аппаратно)
@@ -30,7 +30,7 @@ public:
         _blockMaxSize=blockMaxSize;
         if (inited) return true;
 
-        return MWStream::begin();
+        return MWStreamAddr::begin();
     }
 
     /**

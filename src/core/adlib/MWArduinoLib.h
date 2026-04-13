@@ -6,102 +6,77 @@
 
 #include "Arduino.h"
 
-#ifdef AVR
-extern int __bss_end;
-extern void *__brkval;
-#endif
-#ifdef STM32_MCU_SERIES
-#include <malloc.h>
-extern "C" char *sbrk(int i);
-/* Use linker definition */
-extern char _end;
-extern char _sdata;
-extern char _estack;
-extern char _Min_Stack_Size;
-
-static char *ramstart = &_sdata;
-static char *ramend = &_estack;
-static char *minSP = (char*)(ramend - &_Min_Stack_Size);
+// Используем стандартные макросы архитектуры
+#if defined(ARDUINO_ARCH_AVR)
+    extern int __bss_end;
+    extern void *__brkval;
+#elif defined(STM32_MCU_SERIES)
+    #include <malloc.h>
+    extern "C" char *sbrk(int i);
+    extern char _end;
+    extern char _sdata;
+    extern char _estack;
+    extern char _Min_Stack_Size;
+    static char *ramstart = &_sdata;
+    static char *ramend = &_estack;
+    static char *minSP = (char*)(ramend - &_Min_Stack_Size);
 #endif
 
-uint32_t getFreeMemory() {
-    uint32_t freeValue=0;
-#ifdef ESP8266
-    freeValue=ESP.getFreeHeap();
-#endif
-#ifdef ESP32
-    freeValue=ESP.getFreeHeap();
-#endif
-#ifdef STM32_MCU_SERIES
+// Добавлено inline для предотвращения ошибок линковки
+inline uint32_t getFreeMemory() {
+    uint32_t freeValue = 0;
+
+#if defined(ESP8266) || defined(ESP32)
+    freeValue = ESP.getFreeHeap();
+
+#elif defined(STM32_MCU_SERIES)
     char *heapend = (char*)sbrk(0);
     char * stack_ptr = (char*)__get_MSP();
     struct mallinfo mi = mallinfo();
-	freeValue=((stack_ptr < minSP) ? stack_ptr : minSP) - heapend + mi.fordblks;
-#endif
-#ifdef AVR
-    if((int)__brkval == 0) freeValue = ((int)&freeValue) - ((int)&__bss_end);
-	else freeValue = ((int)&freeValue) - ((int)__brkval);
+    freeValue = ((stack_ptr < minSP) ? stack_ptr : minSP) - heapend + mi.fordblks;
+
+#elif defined(ARDUINO_ARCH_AVR)
+    if((int)__brkval == 0)
+        freeValue = ((int)&freeValue) - ((int)&__bss_end);
+    else
+        freeValue = ((int)&freeValue) - ((int)__brkval);
 #endif
     return freeValue;
 }
 
-void resetController() {
+inline void resetController() {
 #if defined(ESP8266) || defined(ESP32)
     ESP.restart();
-#endif
-#ifdef STM32_MCU_SERIES
+#elif defined(STM32_MCU_SERIES)
     NVIC_SystemReset();
+#else
+    // Fallback для других платформ (перезагрузка через указатель на 0 - опасно, но работает на многих)
+    // Или просто while(1);
+    void (*resetFunc)(void) = 0;
+    resetFunc();
 #endif
 }
 
-uint32_t getChipID() {
-    uint32_t chipID=0;
+inline uint32_t getChipID() {
+    uint32_t chipID = 0;
+
 #ifdef MWOS_CHIP_ID
-    chipID=MWOS_CHIP_ID;
+    chipID = MWOS_CHIP_ID;
 #else
-    #ifdef ESP8266
-    chipID=ESP.getChipId();
-#endif
-#ifdef ESP32
-    chipID=(uint32_t) ESP.getEfuseMac();
-#endif
-#ifdef STM32_MCU_SERIES
-    uint32_t *idBase3 =  (uint32_t *) (0x1FFFF7E8+0x08);
-    chipID=*(idBase3);
-#endif
+    #if defined(ESP8266)
+        chipID = ESP.getChipId();
+    #elif defined(ESP32)
+        // getEfuseMac возвращает 64 бит, берем младшие 32
+        chipID = (uint32_t)(ESP.getEfuseMac() & 0xFFFFFFFF);
+    #elif defined(STM32_MCU_SERIES)
+        uint32_t *idBase3 = (uint32_t *)(0x1FFFF7E8 + 0x08);
+        chipID = *(idBase3);
+    #elif defined(ARDUINO_ARCH_AVR)
+        // У простых AVR нет уникального серийного номера в стандартном доступе
+        chipID = 0;
+    #endif
 #endif
     return chipID;
 }
 
-
-uint8_t getPlatform() {
-    uint8_t pl=0;
-#ifdef STM32_MCU_SERIES
-    pl=33;
 #endif
-#ifdef __STM32F1__
-    pl=34;
-#endif
-#ifdef ESP8266
-    pl= 60;
-#endif
-#ifdef ESP32
-    pl= 64;
-#endif
-#if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega328__)
-    pl= 1;
-#endif
-#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega2560P__)
-    pl= 2;
-#endif
-#if defined(__AVR_ATmega168P__) || defined(__AVR_ATmega168__)
-    pl= 3;
-#endif
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega1280P__)
-    pl= 4;
-#endif
-    return pl;
-}
-
-
-#endif //MWOS3_MWARDUINOLIB_H

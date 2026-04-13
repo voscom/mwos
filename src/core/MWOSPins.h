@@ -1,20 +1,44 @@
 #ifndef MWOS3_MWOSPINS_H
 #define MWOS3_MWOSPINS_H
+
+#include <stdlib.h>
+#ifdef _GLIBCXX_STD_FUNCTION_H
+#define voidFuncPtr std::function<void(void)>
+#else
+typedef void (*voidFuncPtr)(void);
+voidFuncPtr _callback=NULL;
+#endif
+
+enum MW_PIN_MODE: uint8_t {
+    MW_PIN_INPUT =0,
+    MW_PIN_INPUT_PULLDOWN =1,
+    MW_PIN_INPUT_PULLUP =2,
+    MW_PINT_INPUT_ADC=3,
+    MW_PIN_OUTPUT =8,
+    MW_PIN_OUTPUT_OPEN_DRAIN =9,
+    MW_PIN_OUTPUT_PWM =10,
+    MW_PIN_OUTPUT_DAC =11,
+
+    MW_PIN_DONT_INIT = 255
+};
+
+
 /***
  * Блок расширения портов микроконтроллера
  */
 class MWOSPins {
-
 public:
 
     /**
      * Первый порт на этом блоке (от него начинается нумерация портов на блоке)
      */
     MWOS_PIN_INT firstPin;
+    MWOS_PIN_INT lastPin;
     MWOSPins * next=NULL; // Следующий модуль расширитель портов
 
     MWOSPins(MWOS_PIN_INT _firstPin=0) {
         firstPin=_firstPin;
+        lastPin=127;
         pinReset=-1;
     }
 
@@ -26,18 +50,11 @@ public:
     MWOSPins *  add(MWOSPins * newPorts) {
         if (next==NULL) {
             next=newPorts;
-            if (newPorts->firstPin<firstPin+getCount()) newPorts->firstPin=firstPin+getCount();
-            MW_LOG(F("newPorts: ")); MW_LOG(newPorts->firstPin); MW_LOG('+'); MW_LOG_LN(newPorts->getCount());
+            if (newPorts->firstPin<=lastPin) newPorts->firstPin=lastPin+1;
+            MW_LOG(F("newPorts: ")); MW_LOG(newPorts->firstPin); MW_LOG(':'); MW_LOG_LN(newPorts->lastPin);
             return newPorts;
         }
         return next->add(newPorts); // если следующая плата уже есть - рекурсивно вызовем для нее добавление
-    }
-
-    /**
-     * Возвращает количество портов на текущем блоке
-     */
-    virtual uint8_t getCount() {
-        return 128;
     }
 
     /**
@@ -67,45 +84,36 @@ public:
 
     bool isPin(MWOS_PIN_INT pinNum) {
         pin=pinNum;
-        return ((firstPin<=pin) && (firstPin+getCount()>pin));
+        return ((firstPin<=pin) && (lastPin>=pin));
     }
 
     /**
-     * Задать режим на вход или на выход
-     * и подтяжку, если нужно
-     * @param	outPort	настройить порт на выход (false - на вход)
-     * @param   pull тип подтяжки порта (0-нет, 1-на 0, 2-на питание, 3 - открытый коллектор)
+     * Задать режим порта (вход, выход, подтяжка...)
+     * @param pinMode   Режим порта
+     * @return Успешно, или нет
      */
-    virtual bool mode(bool outPort, uint8_t pull) {
-        return true;
-    }
-
-    virtual bool isPWM() {
+    virtual bool mode(MW_PIN_MODE mode) {
         return false;
     }
 
-    virtual bool isDAC() {
+    virtual bool write(bool dat) {
         return false;
     }
 
-    virtual bool isADC() {
+    virtual bool writePWM(uint16_t dat) {
         return false;
     }
 
-    virtual bool writeDigital(bool dat) {
+    virtual bool writeDAC(uint16_t dat) {
         return false;
     }
 
-    virtual bool writeAnalog(uint16_t dat) {
+    virtual bool read() {
         return false;
     }
 
-    virtual bool readDigital() {
+    virtual uint32_t readADC() {
         return false;
-    }
-
-    virtual uint16_t readAnalog() {
-        return 0;
     }
 
     virtual int8_t getInterrupt() {
@@ -115,11 +123,10 @@ public:
     /**
      * Подключить прерывание для порта
      */
-#if defined(ESP32) || defined(ESP8266) || defined(STM32_MCU_SERIES)
-    virtual bool attach(std::function<void(void)> intRoutine, int mode=RISING) {
-		return false;
-	}
-#endif
+    virtual bool attach(voidFuncPtr funcPtr, int mode) {
+        return false;
+    }
+
     /**
      * Отключить прерывание для порта
      */
@@ -130,6 +137,22 @@ public:
 protected:
     MWOS_PIN_INT pinReset=-1; // Порт, к которому подключена ножка RESET этого расширителя портов
     MWOS_PIN_INT pin; // Текущий порт, с которым идет работа
+
+    /**
+     * Есть ли этот пин в массиве?
+     * @param arrayPins Массив
+     * @param arraySize Размер массива
+     * @return  Есть или нет
+     */
+    bool IsPinInArray(uint8_t * arrayPins, uint8_t arraySize) {
+        if (pin<0 || arraySize<1 || arrayPins==NULL) return false;
+        for (size_t i = 0; i < arraySize; i++) {
+            uint8_t pn = pgm_read_byte_near(arrayPins + i);
+            if (pn==pin) return true;
+        }
+        return false;
+    }
+
 };
 
 

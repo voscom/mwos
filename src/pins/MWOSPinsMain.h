@@ -1,172 +1,200 @@
 #ifndef MWOS3_MWOSPORTSMAIN_H
 #define MWOS3_MWOSPORTSMAIN_H
-
+#include "Arduino.h"
 #include "core/MWOSPins.h"
 #ifndef AVR
 #include <functional>
 #endif
+
 #if defined(ESP32) || defined(ESP8266)
 #include <FunctionalInterrupt.h>
 #endif
 
-#define mwos_pins_pull_down 1
-#define mwos_pins_pull_up 2
-#define mwos_pins_open_drain 3
-#define mwos_pins_analog_input 3
+// доступные порты, необходимо задавать в platform.ini:
+/*
+build_flags =
+    -D CORE_DEBUG_LEVEL=5
+    -D PINS_INPUT=15,2,14,16,17,5,18,19,21,3,1,22,23,13,12,14,27,26,25,33,32,34,35,36,39
+    -D PINS_INPUT_PULLUP=15,2,14,16,17,18,19,21,3,1,22,23,13,12,14,27,26,25,33,32
+    -D PINS_INPUT_PULLDOWN=15,14,16,17,5,18,19,21,3,1,22,23,13,12,14,27,26,25,33,32
+    -D PINS_ADC=25,26,27,32,33,12,13,14,15,2,4,34,35,36,39
+    -D PINS_OUTPUT=15,2,14,16,17,5,18,19,21,3,1,22,23,13,12,14,27,26,25,33,32
+    -D PINS_OPEN_DRAIN=15,14,16,17,18,19,21,3,1,22,23,13,12,14,27,26,25,33,32
+    -D PINS_PWM=15,2,14,16,17,5,18,19,21,3,1,22,23,13,12,14,27,26,25,33,32
+    -D PINS_DAC=25,26
+    -D PINS_RTC=4,2,15,13,12,14,27,26,25,33,32,35,34,39,36
+    -D PINS_TOUCH=4,2,15,13,12,14,27,33,32
+    -D PINS_BOOT=1,3,2,4,12,13,0,5,14,15
+    -D PINS_LED=2
+    -D PINS_USB=1,3
+*/
+
+#ifndef PINS_INPUT_PULLUP
+#define PINS_INPUT_PULLUP
+#endif
+#ifndef PINS_INPUT_PULLDOWN
+#define PINS_INPUT_PULLDOWN
+#endif
+#ifndef PINS_ADC
+#define PINS_ADC
+#endif
+#ifndef PINS_OPEN_DRAIN
+#define PINS_OPEN_DRAIN
+#endif
+#ifndef PINS_PWM
+#define PINS_PWM
+#endif
+#ifndef PINS_DAC
+#define PINS_DAC
+#define PINS_NOT_DAC
+#endif
+#ifndef PINS_RTC
+#define PINS_RTC
+#endif
+#ifndef PINS_TOUCH
+#define PINS_TOUCH
+#endif
+#ifndef PINS_LED
+#define PINS_LED    LED_BUILTIN
+#endif
+#ifndef PINS_USB
+#define PINS_USB    SOC_RX0,SOC_TX0
+#endif
+#ifndef PINS_BOOT
+#define PINS_BOOT   PINS_USB
+#endif
+
+const char PinsINPUT[] PROGMEM = { PINS_INPUT }; // ОБЯЗАТЕЛЬНО!!! задавать в platform.ini
+const char PinsOUTPUT[] PROGMEM = { PINS_OUTPUT }; // ОБЯЗАТЕЛЬНО!!! задавать в platform.ini
+const char PinsINPUT_PULLUP[] PROGMEM = { PINS_INPUT_PULLUP };
+const char PinsINPUT_PULLDOWN[] PROGMEM = { PINS_INPUT_PULLDOWN };
+const char PinsADC[] PROGMEM = { PINS_ADC };
+const char PinsOPEN_DRAIN[] PROGMEM = { PINS_OPEN_DRAIN };
+const char PinsPWM[] PROGMEM = { PINS_PWM };
+const char PinsDAC[] PROGMEM = { PINS_DAC };
+
+const char PinsRTC[] PROGMEM = { PINS_RTC };
+const char PinsTOUCH[] PROGMEM = { PINS_TOUCH };
+const char PinsBOOT[] PROGMEM = { PINS_BOOT };
+const char PinsLED[] PROGMEM = { PINS_LED };
+const char PinsUSB[] PROGMEM = { PINS_USB };
 
 /***
  * Блок портов микроконтроллера
- * Может находиться на внешней микросхемме
+ * Может находиться на внешней микросхеме
  */
 class MWOSPinsMain : public MWOSPins {
-
 public:
 
     MWOSPinsMain() : MWOSPins() {
+        lastPin=127; // последний пин
     }
 
     /**
-     * Возвращает количество портов на текущей микросхемме
+     * Задать режим порта (вход, выход, подтяжка...)
+     * @param pinMode   Режим порта
+     * @return Успешно, или нет
      */
-    virtual uint8_t getCount() {
-        return 128;
-    }
+    virtual bool mode(MW_PIN_MODE mode) {
+        if (pin<firstPin || pin>lastPin) return false;
+        switch (mode) {
+            case MW_PIN_INPUT: {
+                if (IsPinInArray((uint8_t *) &PinsINPUT, sizeof(PinsINPUT))) {
+                    pinMode(pin,INPUT);
+                    return true;
+                }
+            } break;
+            case MW_PIN_INPUT_PULLDOWN: {
+                if (IsPinInArray((uint8_t *) &PinsINPUT_PULLDOWN, sizeof(PinsINPUT_PULLDOWN))) {
+#if defined(ESP32)
+                    pinMode(pin,INPUT_PULLDOWN);
+#elif defined(ESP8266)
+                    pinMode(pin,INPUT_PULLDOWN_16);
+#else
+                    pinMode(pin,INPUT);
+#endif
+                    return true;
+                }
+            } break;
+            case MW_PIN_INPUT_PULLUP: {
+                if (IsPinInArray((uint8_t *) &PinsINPUT_PULLUP, sizeof(PinsINPUT_PULLUP))) {
+                    pinMode(pin,INPUT_PULLUP);
+                    return true;
+                }
+            } break;
+            case MW_PINT_INPUT_ADC: {
+                if (IsPinInArray((uint8_t *) &PinsADC, sizeof(PinsADC))) {
+                    pinMode(pin,INPUT);
+                    return true;
+                }
+            } break;
+            case MW_PIN_OUTPUT: {
+                if (IsPinInArray((uint8_t *) &PinsOUTPUT, sizeof(PinsOUTPUT))) {
+                    pinMode(pin,OUTPUT);
+                    return true;
+                }
+            } break;
+            case MW_PIN_OUTPUT_OPEN_DRAIN: {
+                if (IsPinInArray((uint8_t *) &PinsOPEN_DRAIN, sizeof(PinsOPEN_DRAIN))) {
+#if defined(ESP32)
+                    pinMode(pin,OPEN_DRAIN);
+#else
+                    pinMode(pin,OUTPUT);
+#endif
+                    return true;
+                }
+            } break;
+            case MW_PIN_OUTPUT_PWM: {
+                if (IsPinInArray((uint8_t *) &PinsPWM, sizeof(PinsPWM))) {
+                    pinMode(pin,OUTPUT);
+                    return true;
+                }
+            } break;
+            case MW_PIN_OUTPUT_DAC: {
+                if (IsPinInArray((uint8_t *) &PinsDAC, sizeof(PinsDAC))) {
+#if defined(ESP32)
+                    pinMode(pin,ANALOG);
+#else
+                    pinMode(pin,OUTPUT);
+#endif
+                    return true;
+                }
+            } break;
+            default: {
 
-    /**
-     * Задать режим на вход или на выход
-     * и подтяжку, если нужно
-     * @param	outPort	настройить порт на выход (false - на вход)
-     * @param   pull тип подтяжки порта (0-нет, 1-на 0, 2-на питание, 3 - на выход открытый коллектор, на вход - аналоговый)
-     */
-    virtual bool mode(bool outPort, uint8_t pull) {
-#ifdef ESP32
-        if (pin>=NUM_DIGITAL_PINS && pin!=LED_BUILTIN) return false;
-#endif
-        MW_LOG(F("mode: ")); MW_LOG(pin); MW_LOG('='); MW_LOG(outPort); MW_LOG(';'); MW_LOG_LN(pull);
-        if (outPort) { // на выход
-            if (pull==mwos_pins_open_drain) {
-#ifndef __AVR
-                pinMode(pin, OUTPUT_OPEN_DRAIN); // открытый коллектор
-#else
-                pinMode(pin,OUTPUT);
-#endif
-            } else if (pull==mwos_pins_pull_down) {
-#ifdef ESP32
-                pinMode(pin, PULLDOWN); // включим подтяжку
-#else
-                pinMode(pin,OUTPUT);
-#endif
-            } else if (pull==mwos_pins_pull_up) {
-#ifdef ESP32
-                pinMode(pin, PULLUP); // включим подтяжку
-#else
-                pinMode(pin,OUTPUT);
-#endif
-            } else {
-                pinMode(pin,OUTPUT);
             }
-        } else { // на вход
-            if (pull==mwos_pins_analog_input) {
-#if defined(ESP32) || defined(STM32_MCU_SERIES)
-#ifndef INPUT_ANALOG
-#define INPUT_ANALOG ANALOG
-#endif
-                pinMode(pin,INPUT_ANALOG);
-#else
-                pinMode(pin,INPUT);
-#endif
-            } else
-            if (pull==mwos_pins_pull_down) {
-#if defined(ESP32) || defined(STM32_MCU_SERIES)
-                pinMode(pin, INPUT_PULLDOWN);
-#endif
-#ifdef ESP8266
-                if (pin==16) pinMode(pin, INPUT_PULLDOWN_16);
-                else  pinMode(pin,INPUT);
-#endif
-            } else if (pull==mwos_pins_pull_up) {
-                pinMode(pin, INPUT_PULLUP);
-
-            } else pinMode(pin,INPUT);
         }
-        return true;
-    }
-
-    virtual bool isPWM() {
-#ifdef STM32_MCU_SERIES
-        if (pin < 128) return true;
-#endif
-#ifdef __AVR_ATmega2560__
-        return ((pin>1) && (pin<14));
-#endif
-#ifdef __AVR
-        return ((pin==3) || (pin==5) || (pin==6) || (pin==9) || (pin==10) || (pin==11));
-#endif
-#ifdef ESP8266
-        // один источник и любые GPIO https://esp8266.ru/forum/threads/shim.143/
-#endif
-#ifdef ESP32
-        // несколько источников и любые GPIO
-#endif
-        return true;
-    }
-
-    virtual bool isADC() {
-#if defined(__AVR_ATmega2560__)
-        return ((pin>=A0) && (pin<=A15));
-#endif
-#if defined(__AVR)
-        return ((pin>=A0) && (pin<=A7));
-#endif
-#ifdef STM32_MCU_SERIES
-        return ((pin>=PA0) && (pin<=PA7)) || (pin==PB0) || (pin==PB1);
-#endif
-#ifdef ESP8266
-        return (pin==A0);
-#endif
-#ifdef ESP32
-        return (digitalPinToAnalogChannel(pin) >= 0);
-#endif
+        MW_LOG_TIME();  MW_LOG(pin); MW_LOG(F(" pin error mode ")); MW_LOG_LN((uint8_t) mode);
         return false;
     }
 
-    virtual bool writeDigital(bool dat) {
-        MW_LOG(F("wd: ")); MW_LOG(pin); MW_LOG('='); MW_LOG_LN(dat);
+    virtual bool write(bool dat) {
         digitalWrite(pin,dat);
         return true;
     }
 
-    virtual bool writeAnalog(uint16_t dat) {
-        if (isPWM()) {
-#ifdef STM32_MCU_SERIES
-            analogWrite(pin,dat);
-#endif
-#if defined(__AVR)
-            analogWrite(pin,dat);
-#endif
-            // TODO: тут делаем analogWrite для ESP32 и ESP8266
-#if defined(ESP8266)
-#endif
-#if defined(ESP32)
-            ledcAttachPin(pin, 0); // нулевой канал PWM
-			ledcWrite(0,dat);
-#endif
-            return true;
-        }
-        return false;
+    virtual bool writePWM(uint16_t dat) {
+        analogWrite(pin,dat);
+        return true;
     }
 
-    virtual bool readDigital() {
+    virtual bool writeDAC(uint16_t dat) {
+#ifndef PINS_NOT_DAC
+        dacWrite(pin,dat);
+#endif
+        return true;
+    }
+
+    virtual bool read() {
         return digitalRead(pin);
     }
 
-    virtual uint16_t readAnalog() {
-        if (!isADC()) return readDigital();
+    virtual uint32_t readADC() {
         return analogRead(pin);
     }
 
     virtual int8_t getInterrupt() {
-#if defined(ESP32) || defined(ESP8266)
+ #if defined(ESP32) || defined(ESP8266)
         return digitalPinToInterrupt(pin);
 #endif
         return -1;
@@ -175,22 +203,21 @@ public:
     /**
      * Подключить прерывание для порта
      */
-#if defined(ESP32) || defined(ESP8266) || defined(STM32_MCU_SERIES)
-    virtual bool attach(std::function<void(void)> intRoutine, int mode=RISING) {
+    virtual bool attach(voidFuncPtr funcPtr, int mode) {
         int8_t interrupt=getInterrupt();
         if (interrupt<0) return false;
 #if defined(ESP8266)
-        //attachInterrupt(interrupt,void (*)(void) intRoutine,mode);
+        //attachInterrupt(interrupt,void (*)(void) funcPtr,mode);
 #endif
 #if defined(ESP32) || defined(ESP8266)
-		attachInterrupt(interrupt,intRoutine,mode);
+        attachInterrupt(interrupt,funcPtr,mode);
 #endif
 #ifdef STM32_MCU_SERIES
-        //attachInterrupt(interrupt,(voidFuncPtr) intRoutine,mode);
+        //attachInterrupt(interrupt,(voidFuncPtr) funcPtr,mode);
 #endif
         return true;
-	}
-#endif
+    }
+
     /**
      * Отключить прерывание для порта
      */

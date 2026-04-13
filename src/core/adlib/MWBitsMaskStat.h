@@ -41,6 +41,14 @@ public:
         return bitsCount;
     }
 
+    /***
+     * Возвращает количество байт в хранилище
+     * @return
+     */
+    size_t bytesSize() {
+        return sizeof(bits);
+    }
+
     /**
      * Записать бит
      * @param value
@@ -64,7 +72,7 @@ public:
      * @return
      */
     bool getBit(uint16_t bitOffset) {
-        if (bitOffset<bitsCount) return bitRead(bits[bitOffset >> 3],bitOffset);
+        if (bitOffset<bitsCount) return bitRead(bits[bitOffset >> 3],bitOffset & 7);
         return false;
     }
 
